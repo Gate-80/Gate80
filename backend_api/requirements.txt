@@ -1,0 +1,36 @@
+1. Environment Preparation
+
+The backend is implemented using Python and FastAPI.
+Ensure that Python (version 3.9 or later) is installed on your machine.
+
+
+2. Installing Dependencies
+
+Install the required Python packages using pip:
+   pip install fastapi uvicorn
+These packages are used to:
+	•	Build REST APIs (FastAPI)
+	•	Run the backend development server (Uvicorn)
+
+
+3. Creating the First API Endpoint
+
+first clone the project:
+  git clone https://github.com/WedAbdullh/RASD_adaptive-api-deception.git
+  cd RASD_adaptive-api-deception
+
+after clone the project you can use  backend_api/hello.py file, to use in running the server
+
+
+4. Running the Backend Server
+
+From inside the backend_api directory, start the server using:
+   uvicorn main:app --reload
+used to start a FastAPI application using the Uvicorn server. It tells Uvicorn to run the FastAPI app object named app that is defined inside the Python file hello.py.
+
+To test the /hello endpoint, open a browser and visit:
+   http://127.0.0.1:8000/hello
+
+Expected response: {"message": "Hello from RASD"}
+
+
