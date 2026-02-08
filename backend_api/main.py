@@ -14,6 +14,6 @@ def hello():
 
 app.include_router(
     user_accounts.router,
-    prefix="/me",
+    prefix="/api/v1",
     tags=["user-accounts"]
 )
