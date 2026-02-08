@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from backend_api.routers import user_accounts
 
 app = FastAPI()
 
@@ -10,3 +11,9 @@ def health_check():
 def hello():
     return {"message": "Hello from RASD"}
 
+
+app.include_router(
+    user_accounts.router,
+    prefix="/me",
+    tags=["user-accounts"]
+)
