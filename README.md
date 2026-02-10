@@ -1,99 +1,152 @@
-# Digital Wallet API – Adaptive API Deception Prototype 
+# Adaptive API Deception Prototype – Digital Wallet API
 
 ## Overview
-This repository contains the initial implementation of a **Graduation Project focused on Adaptive API Deception**.  
-The project aims to study, design, and evaluate techniques for applying deception mechanisms at the API level in order to improve security, detect malicious behavior, and mislead attackers interacting with exposed APIs.
+This repository contains **RASD**, a cloud-based adaptive deception system for API endpoints.
 
-At this stage, the project focuses on establishing a **realistic environment** that can later be used to apply and evaluate deception strategies.
+RASD aims to enhance API security by intercepting API traffic, analyzing request behavior, and dynamically engaging suspicious activity using realistic decoy APIs, while allowing legitimate traffic to reach real backend services.
 
----
+At a high level, the system:
+- Intercepts incoming API traffic using a reverse proxy
+- Analyzes request behavior using machine learning and threat intelligence
+- Dynamically decides whether traffic is legitimate or suspicious
+- Forwards legitimate traffic to real backend services
+- Redirects suspicious traffic to realistic digital-twin API decoys
+- Collects logs and attacker interaction data for analysis
 
-## Project Scope
-The overall project investigates:
-- How attackers interact with documented APIs
-- The security implications of exposed OpenAPI / Swagger documentation
-- How deception techniques can be applied dynamically at the API layer
-- How realistic “customer systems” can be used as controlled targets for experimentation
-
-The current implementation represents an **early phase** of the project, where foundational components and system structure are being established.
+This project is developed for **academic and research purposes**.
 
 ---
 
-## Customer System: Digital Wallet API
-As part of the project, a **Digital Wallet System** is implemented to act as a **customer-side API**.
+## System Components
+The RASD system consists of the following components:
 
-This system is **not the main product**, but rather a **representative real-world backend** that:
-- Exposes realistic API endpoints
-- Mimics common financial application behavior
-- Provides an attack surface for future deception experiments
-
-The Digital Wallet API is used to:
-- Simulate legitimate client interactions
-- Observe how attackers explore and abuse APIs
-- Serve as an input to deception mechanisms in later stages
+- **Customer Backend APIs** – Realistic backend services protected by RASD  
+- **Reverse Proxy Layer** – Intercepts and controls all incoming API traffic  
+- **Digital-Twin API Decoys** – Synthetic APIs that replicate real endpoint behavior  
+- **Anomaly Detection Engine** – Identifies abnormal or suspicious API behavior  
+- **Threat Intelligence Integration** – Enriches traffic analysis using known threat data  
+- **Adaptive Decision Engine** – Determines how each request is handled  
+- **Monitoring & Dashboard** – Provides logs, alerts, and visibility into interactions  
 
 ---
 
-## High-Level System Components
-The project is conceptually divided into the following components:
+## Customer Backend APIs
+Customer backend APIs represent the applications being protected by the RASD system.  
+These APIs are intentionally designed to be realistic, consistent, and worth interacting with.
 
-- **Customer API (Digital Wallet System)**  
-  A realistic backend API representing a financial application.
-...
----
+### Digital Wallet API
+A **Digital Wallet backend system** is implemented as a representative customer API.  
+It simulates common functionality found in fintech and financial applications.
 
-## Digital Wallet API – Design Overview 
-The Digital Wallet API is designed to resemble a real-world system and includes the following **conceptual endpoint groups**.
 
-> **Note:** These endpoints represent the intended design. Only a subset is implemented at this stage.
+### Available Endpoints
+The following endpoint names represent the **designed API surface** of the Digital Wallet system:
 
-### User Accounts
-- View User Profile  
-- Update User Profile  
-- Add Bank Account Information  
-- View Bank Account Information  
-- Update Bank Account Information  
+#### User Accounts
+- View user profile  
+- Update user profile  
+- Add bank account  
+- View bank accounts  
+- Update bank account  
 
-### Wallet Operations
-- View Wallet Balance  
-- Transfer Funds to Another User  
-- Transfer Funds to Bank Account  
-- Top Up Wallet Balance  
-- Withdrawal  
-- Bill Payment  
+#### Wallet Operations
+- View wallet balance  
+- Transfer funds to another user  
+- Transfer funds to bank account  
+- Top up wallet balance  
+- Withdraw funds  
+- Pay bills  
 
-### Payments / Transactions
-- View User Payments  
-- View Payment Details  
+#### Payments/Transactions
+- View user payments  
+- View payment details  
 
-### Admin Operations
-- View All Registered Users  
-- View All Wallets  
-- View All Transactions  
-- View System Financial Overview  
+#### Admin Operations
+- View all registered users  
+- View all wallets  
+- View all transactions  
+- View system financial overview  
 
-### Authentication
-- User Sign Up / Sign In / Sign Out  
-- Admin Sign In / Sign Out  
+#### User Authentication
+- User sign up  
+- User sign in  
+- User sign out
 
-These endpoints are included to provide **realism and structure**, and to reflect how actual digital wallet APIs are designed.
+#### Admin Authentication
+- Admin sign in  
+- Admin sign out  
 
----
-
-## Technology Stack
-- **Backend Framework:** FastAPI (Python)
-- **API Style:** RESTful
-- **API Documentation:** OpenAPI (Swagger)
-- **Server:** Uvicorn (ASGI)
-- **Data Storage:** In-memory (prototype phase)
+All data is stored in-memory and uses realistic, consistent fake data for testing and experimentation.
 
 ---
 
-## Future Work
+## API Reference
+Interactive API documentation is available through **Swagger UI** once the backend server is running.
 
+![Swagger – User Accounts](docs/images/swagger-users.png)
+
+---
+## Technology Stack (Current Phase)
+- Framework: FastAPI (Python)
+- API Style: REST
+- Documentation: OpenAPI / Swagger
+- Server: Uvicorn
+- Storage: In-memory data structures
+---
+
+## Setup & Installation
+
+### 1. Environment Preparation
+- Python 3.9 or later
+- Backend implemented using FastAPI
+
+### 2. Install Dependencies
+    pip install fastapi uvicorn
+
+### 3. Clone the Repository
+    git clone https://github.com/WedAbdullh/RASD_adaptive-api-deception.git
+    cd RASD_adaptive-api-deception
+
+### 4. Run the Backend Server
+From inside the backend_api directory:
+    uvicorn main:app --reload
+
+### 5. Test the API
+Swagger UI:
+    http://127.0.0.1:8000/docs
+
+Example test endpoint:
+    http://127.0.0.1:8000/hello
+
+Expected response:
+    { "message": "Hello from RASD" }
 
 ---
 
-## Academic Context
-This project is developed as part of a graduation project focused on API security and adaptive deception, using realistic API design to simulate real-world attack surfaces.
+## Repository Structure
+    RASD_adaptive-api-deception/
+    │
+    ├── backend_api/        # Customer backend APIs
+    │   ├── main.py
+    │   ├── hello.py
+    │   └── ...
+    │
+    ├── README.md
+    └── ...
 
+---
+
+## Authors
+- Rama Alguthmi  
+- Wed Alotaibi  
+- Taif Alsaadi  
+- Rahaf Lamphon  
+
+---
+
+## Acknowledgments
+
+---
+
+## Contact
+📧 Contact information will be added.
