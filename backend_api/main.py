@@ -20,7 +20,7 @@ app.include_router(
 app.include_router(
    wallet.router,
     prefix="/api/v1",
-    tags=["Wallet"]
+    tags=["wallet"]
 )
 app.include_router(
    admin_operations.router,
