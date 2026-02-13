@@ -1,6 +1,5 @@
 from fastapi import FastAPI
-from backend_api.routers import user_accounts
-from backend_api.routers import wallet
+from backend_api.routers import admin_authentication, admin_operations, user_accounts, wallet
 
 app = FastAPI()
 
@@ -22,5 +21,15 @@ app.include_router(
    wallet.router,
     prefix="/api/v1",
     tags=["Wallet"]
+)
+app.include_router(
+   admin_operations.router,
+    prefix="/api/v1",
+    tags=["admin-operations"]
 
+)
+app.include_router(
+    admin_authentication.router,
+    prefix="/api/v1",
+    tags=["admin-authentication"]
 )
