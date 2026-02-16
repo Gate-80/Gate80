@@ -1,54 +1,74 @@
-from fastapi import FastAPI, Request, HTTPException
-from backend_api.routers import admin_authentication, admin_operations, user_accounts, wallet, user_authentication
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from backend_api.routers import (
+    admin_authentication, 
+    admin_operations, 
+    user_accounts, 
+    wallet, 
+    user_authentication
+)
+from backend_api.db.database import init_db
 
-app = FastAPI()
+app = FastAPI(title="RASD Digital Wallet API", version="1.0.0")
 
-from fastapi import FastAPI, Request, HTTPException
-from backend_api.routers import admin_authentication, admin_operations, user_accounts, wallet, user_authentication
+# Initialize database on startup
+@app.on_event("startup")
+def startup_event():
+    """Initialize database tables on application startup"""
+    init_db()
+    print("✅ Database initialized")
 
-app = FastAPI()
 
+# Middleware to block direct backend access (for proxy setup)
 @app.middleware("http")
 async def block_direct_backend_access(request: Request, call_next):
-    if request.url.path in ("/health", "/docs", "/openapi.json"):
+    """Block direct access to backend - requests must come through proxy"""
+    # Allow health check, docs, and OpenAPI schema
+    if request.url.path in ("/health", "/docs", "/openapi.json", "/redoc"):
         return await call_next(request)
-
+    
+    # Check for proxy header
     if request.headers.get("X-From-Proxy") != "1":
-         return JSONResponse(
+        return JSONResponse(
             status_code=403,
             content={"detail": "Direct backend access blocked"}
         )
-
-
+    
     return await call_next(request)
 
 
+# Health check endpoint
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    """Health check endpoint"""
+    return {"status": "ok", "service": "digital-wallet-api"}
+
 
 @app.get("/hello")
 def hello():
-    return {"message": "Hello from RASD"}
+    """Hello world endpoint"""
+    return {"message": "Hello from RASD Digital Wallet API"}
 
+
+# Include routers
+app.include_router(
+    user_authentication.router,
+    prefix="/api/v1",
+    tags=["user-authentication"]
+)
 
 app.include_router(
     user_accounts.router,
     prefix="/api/v1",
     tags=["user-accounts"]
 )
+
 app.include_router(
-   wallet.router,
+    wallet.router,
     prefix="/api/v1",
     tags=["wallet"]
 )
-app.include_router(
-   admin_operations.router,
-    prefix="/api/v1",
-    tags=["admin-operations"]
 
-)
 app.include_router(
     admin_authentication.router,
     prefix="/api/v1",
@@ -56,7 +76,7 @@ app.include_router(
 )
 
 app.include_router(
-    user_authentication.router,
+    admin_operations.router,
     prefix="/api/v1",
-    tags=["user-authentication"]
+    tags=["admin-operations"]
 )

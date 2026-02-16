@@ -1,22 +1,27 @@
-# backend_api/routers/wallet.py
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, condecimal
-from typing import Dict, Any
 from decimal import Decimal
+from sqlalchemy.orm import Session
 
-from backend_api.db.users_store import T_USERS, now_iso
-from backend_api.db.wallet_store import T_WALLETS, T_TRANSACTIONS
+from backend_api.db.database import get_db
+from backend_api.db.models import User, Wallet, Transaction, TransactionType, TransactionStatus
+from backend_api.db.audit_helper import (
+    log_wallet_topup, 
+    log_wallet_withdraw, 
+    log_user_transfer, 
+    log_bill_payment,
+    log_failed_action
+)
 
-router = APIRouter(tags=["wallet"])
+router = APIRouter()
 
 # -----------------------------
 # Schemas
 # -----------------------------
-
 class WalletBalanceResponse(BaseModel):
     user_id: str
-    balance: str  # Changed to string to match stored format
+    balance: str
     currency: str
 
 
@@ -25,226 +30,311 @@ class WalletAmountRequest(BaseModel):
 
 
 # -----------------------------
-# Helpers
+# Helper Functions
 # -----------------------------
-
-def get_wallet_or_404(user_id: str) -> Dict[str, Any]:
-    # Fix: T_WALLETS is keyed by wallet_id, not user_id, so we need to search
-    wallet = next((w for w in T_WALLETS.values() if w["user_id"] == user_id), None)
+def get_wallet_or_404(db: Session, user_id: str) -> Wallet:
+    """Get user's wallet or raise 404"""
+    wallet = db.query(Wallet).filter_by(user_id=user_id).first()
     if not wallet:
         raise HTTPException(status_code=404, detail="Wallet not found")
     return wallet
 
 
-def ensure_user_exists(user_id: str):
-    if user_id not in T_USERS:
+def ensure_user_exists(db: Session, user_id: str):
+    """Check if user exists, raise 404 if not"""
+    user = db.query(User).filter_by(id=user_id).first()
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
 
-def generate_transaction_id() -> str:
-    """Generate next transaction ID using max + 1"""
-    existing_ids = [int(tx["id"].split("_")[1]) for tx in T_TRANSACTIONS if tx["id"].startswith("tx_")]
+def generate_transaction_id(db: Session) -> str:
+    """Generate next transaction ID"""
+    transactions = db.query(Transaction).all()
+    if not transactions:
+        return "tx_7001"
+    
+    existing_ids = [int(tx.id.split("_")[1]) for tx in transactions if tx.id.startswith("tx_")]
     next_id = max(existing_ids, default=7000) + 1
     return f"tx_{next_id}"
 
 
 def create_transaction(
+    db: Session,
     user_id: str,
     wallet_id: str,
-    tx_type: str,
+    tx_type: TransactionType,
     amount: Decimal,
     currency_code: str,
     counterparty_kind: str,
     counterparty_ref: str,
     description: str,
-    status: str = "COMPLETED"
-) -> None:
-    """Create a properly structured transaction entry"""
-    now = now_iso()
-    T_TRANSACTIONS.append({
-        "id": generate_transaction_id(),
-        "user_id": user_id,
-        "wallet_id": wallet_id,
-        "type": tx_type,
-        "status": status,
-        "amount": {
+    status: TransactionStatus = TransactionStatus.COMPLETED
+) -> Transaction:
+    """Create a transaction record"""
+    new_id = generate_transaction_id(db)
+    
+    transaction = Transaction(
+        id=new_id,
+        user_id=user_id,
+        wallet_id=wallet_id,
+        type=tx_type,
+        status=status,
+        amount={
             "currency_code": currency_code,
             "value": str(amount)
         },
-        "counterparty": {
+        counterparty={
             "kind": counterparty_kind,
             "ref": counterparty_ref
         },
-        "description": description,
-        "created_at": now,
-        "updated_at": now,
-
-    })
+        description=description
+    )
+    
+    db.add(transaction)
+    return transaction
 
 
 # -----------------------------
 # Endpoints
 # -----------------------------
-
 @router.get("/users/{user_id}/wallet", response_model=WalletBalanceResponse)
-def view_wallet_balance(user_id: str):
-    ensure_user_exists(user_id)
-    wallet = get_wallet_or_404(user_id)
+def view_wallet_balance(user_id: str, db: Session = Depends(get_db)):
+    ensure_user_exists(db, user_id)
+    wallet = get_wallet_or_404(db, user_id)
 
     return {
         "user_id": user_id,
-        "balance": wallet["balance"],
-        "currency": wallet["currency_code"],
+        "balance": wallet.balance,
+        "currency": wallet.currency_code,
     }
 
 
 @router.post("/users/{user_id}/wallet/topup")
-def topup_wallet(user_id: str, payload: WalletAmountRequest):
-    ensure_user_exists(user_id)
-    wallet = get_wallet_or_404(user_id)
+def topup_wallet(user_id: str, payload: WalletAmountRequest, db: Session = Depends(get_db)):
+    ensure_user_exists(db, user_id)
+    wallet = get_wallet_or_404(db, user_id)
 
-    # Fix: Use Decimal for accurate money calculations
+    # Use Decimal for accurate money calculations
     amount = Decimal(str(payload.amount))
-    current_balance = Decimal(str(wallet["balance"]))
+    current_balance = Decimal(str(wallet.balance))
     new_balance = current_balance + amount
     
-    wallet["balance"] = str(new_balance)
-    wallet["updated_at"] = now_iso()
+    wallet.balance = str(new_balance)
 
-    # Fix: Create properly structured transaction
+    # Create transaction record
     create_transaction(
+        db=db,
         user_id=user_id,
-        wallet_id=wallet["id"],
-        tx_type="TOPUP",
+        wallet_id=wallet.id,
+        tx_type=TransactionType.TOPUP,
         amount=amount,
-        currency_code=wallet["currency_code"],
+        currency_code=wallet.currency_code,
         counterparty_kind="CARD",
-        counterparty_ref="card_****_0000",  # Placeholder
+        counterparty_ref="card_****_0000",
         description="Top up via card",
-        status="COMPLETED"
+        status=TransactionStatus.COMPLETED
+    )
+    
+    db.commit()
+    db.refresh(wallet)
+    
+    # Log audit
+    log_wallet_topup(
+        db=db, 
+        user_id=user_id, 
+        wallet_id=wallet.id, 
+        amount=str(amount), 
+        currency=wallet.currency_code
     )
 
     return {
         "message": "Wallet topped up",
-        "new_balance": wallet["balance"],
-        "currency": wallet["currency_code"],
+        "new_balance": wallet.balance,
+        "currency": wallet.currency_code,
     }
 
 
 @router.post("/users/{user_id}/wallet/withdraw")
-def withdraw_wallet(user_id: str, payload: WalletAmountRequest):
-    ensure_user_exists(user_id)
-    wallet = get_wallet_or_404(user_id)
+def withdraw_wallet(user_id: str, payload: WalletAmountRequest, db: Session = Depends(get_db)):
+    ensure_user_exists(db, user_id)
+    wallet = get_wallet_or_404(db, user_id)
 
-    # Fix: Use Decimal for accurate money calculations
+    # Use Decimal for accurate money calculations
     amount = Decimal(str(payload.amount))
-    current_balance = Decimal(str(wallet["balance"]))
+    current_balance = Decimal(str(wallet.balance))
 
     if current_balance < amount:
+        # Log failed withdrawal
+        log_failed_action(
+            db=db,
+            event="WALLET_WITHDRAW_FAILED",
+            actor_type="USER",
+            actor_id=user_id,
+            error_message="Insufficient balance"
+        )
         raise HTTPException(status_code=400, detail="Insufficient balance")
 
     new_balance = current_balance - amount
-    wallet["balance"] = str(new_balance)
-    wallet["updated_at"] = now_iso()
+    wallet.balance = str(new_balance)
 
-    # Fix: Create properly structured transaction
+    # Create transaction record
     create_transaction(
+        db=db,
         user_id=user_id,
-        wallet_id=wallet["id"],
-        tx_type="WITHDRAW",
+        wallet_id=wallet.id,
+        tx_type=TransactionType.WITHDRAW,
         amount=amount,
-        currency_code=wallet["currency_code"],
+        currency_code=wallet.currency_code,
         counterparty_kind="BANK",
-        counterparty_ref="bank_account",  # Placeholder
+        counterparty_ref="bank_account",
         description="Withdraw to bank account",
-        status="COMPLETED"
+        status=TransactionStatus.COMPLETED
+    )
+    
+    db.commit()
+    db.refresh(wallet)
+    
+    # Log audit
+    log_wallet_withdraw(
+        db=db, 
+        user_id=user_id, 
+        wallet_id=wallet.id, 
+        amount=str(amount), 
+        currency=wallet.currency_code
     )
 
     return {
         "message": "Withdraw successful",
-        "new_balance": wallet["balance"],
-        "currency": wallet["currency_code"],
+        "new_balance": wallet.balance,
+        "currency": wallet.currency_code,
     }
 
 
 @router.post("/users/{user_id}/wallet/transfer/{target_user_id}")
-def transfer_to_user(user_id: str, target_user_id: str, payload: WalletAmountRequest):
-    ensure_user_exists(user_id)
-    ensure_user_exists(target_user_id)
+def transfer_to_user(
+    user_id: str, 
+    target_user_id: str, 
+    payload: WalletAmountRequest, 
+    db: Session = Depends(get_db)
+):
+    ensure_user_exists(db, user_id)
+    ensure_user_exists(db, target_user_id)
 
-    # Fix: Prevent transfer to self
+    # Prevent transfer to self
     if user_id == target_user_id:
+        log_failed_action(
+            db=db,
+            event="USER_TRANSFER_FAILED",
+            actor_type="USER",
+            actor_id=user_id,
+            error_message="Cannot transfer to yourself"
+        )
         raise HTTPException(status_code=400, detail="Cannot transfer to yourself")
 
-    sender_wallet = get_wallet_or_404(user_id)
-    receiver_wallet = get_wallet_or_404(target_user_id)
+    sender_wallet = get_wallet_or_404(db, user_id)
+    receiver_wallet = get_wallet_or_404(db, target_user_id)
 
-    # Fix: Use Decimal for accurate money calculations
+    # Use Decimal for accurate money calculations
     amount = Decimal(str(payload.amount))
-    sender_balance = Decimal(str(sender_wallet["balance"]))
-    receiver_balance = Decimal(str(receiver_wallet["balance"]))
+    sender_balance = Decimal(str(sender_wallet.balance))
+    receiver_balance = Decimal(str(receiver_wallet.balance))
 
     if sender_balance < amount:
+        log_failed_action(
+            db=db,
+            event="USER_TRANSFER_FAILED",
+            actor_type="USER",
+            actor_id=user_id,
+            error_message="Insufficient balance"
+        )
         raise HTTPException(status_code=400, detail="Insufficient balance")
 
     # Update balances
-    sender_wallet["balance"] = str(sender_balance - amount)
-    sender_wallet["updated_at"] = now_iso()
-    
-    receiver_wallet["balance"] = str(receiver_balance + amount)
-    receiver_wallet["updated_at"] = now_iso()
+    sender_wallet.balance = str(sender_balance - amount)
+    receiver_wallet.balance = str(receiver_balance + amount)
 
-    # Fix: Create properly structured transaction
+    # Create transaction record
     create_transaction(
+        db=db,
         user_id=user_id,
-        wallet_id=sender_wallet["id"],
-        tx_type="TRANSFER_USER",
+        wallet_id=sender_wallet.id,
+        tx_type=TransactionType.TRANSFER_USER,
         amount=amount,
-        currency_code=sender_wallet["currency_code"],
+        currency_code=sender_wallet.currency_code,
         counterparty_kind="USER",
         counterparty_ref=target_user_id,
         description=f"Transfer to user {target_user_id}",
-        status="COMPLETED"
+        status=TransactionStatus.COMPLETED
+    )
+    
+    db.commit()
+    db.refresh(sender_wallet)
+    
+    # Log audit
+    log_user_transfer(
+        db=db, 
+        user_id=user_id, 
+        wallet_id=sender_wallet.id, 
+        amount=str(amount), 
+        to_user=target_user_id
     )
 
     return {
         "message": "Transfer successful",
-        "new_balance": sender_wallet["balance"],
-        "currency": sender_wallet["currency_code"],
+        "new_balance": sender_wallet.balance,
+        "currency": sender_wallet.currency_code,
     }
 
 
 @router.post("/users/{user_id}/wallet/pay-bill")
-def pay_bill(user_id: str, payload: WalletAmountRequest):
-    ensure_user_exists(user_id)
-    wallet = get_wallet_or_404(user_id)
+def pay_bill(user_id: str, payload: WalletAmountRequest, db: Session = Depends(get_db)):
+    ensure_user_exists(db, user_id)
+    wallet = get_wallet_or_404(db, user_id)
 
-    # Fix: Use Decimal for accurate money calculations
+    # Use Decimal for accurate money calculations
     amount = Decimal(str(payload.amount))
-    current_balance = Decimal(str(wallet["balance"]))
+    current_balance = Decimal(str(wallet.balance))
 
     if current_balance < amount:
+        log_failed_action(
+            db=db,
+            event="BILL_PAYMENT_FAILED",
+            actor_type="USER",
+            actor_id=user_id,
+            error_message="Insufficient balance"
+        )
         raise HTTPException(status_code=400, detail="Insufficient balance")
 
     new_balance = current_balance - amount
-    wallet["balance"] = str(new_balance)
-    wallet["updated_at"] = now_iso()
+    wallet.balance = str(new_balance)
 
-    # Fix: Create properly structured transaction
+    # Create transaction record
     create_transaction(
+        db=db,
         user_id=user_id,
-        wallet_id=wallet["id"],
-        tx_type="BILLPAY",
+        wallet_id=wallet.id,
+        tx_type=TransactionType.BILLPAY,
         amount=amount,
-        currency_code=wallet["currency_code"],
+        currency_code=wallet.currency_code,
         counterparty_kind="BILLER",
-        counterparty_ref="biller_0000",  # Placeholder
+        counterparty_ref="biller_0000",
         description="Bill payment",
-        status="COMPLETED"
+        status=TransactionStatus.COMPLETED
+    )
+    
+    db.commit()
+    db.refresh(wallet)
+    
+    # Log audit
+    log_bill_payment(
+        db=db, 
+        user_id=user_id, 
+        wallet_id=wallet.id, 
+        amount=str(amount)
     )
 
     return {
         "message": "Bill paid successfully",
-        "new_balance": wallet["balance"],
-        "currency": wallet["currency_code"],
+        "new_balance": wallet.balance,
+        "currency": wallet.currency_code,
     }
