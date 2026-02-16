@@ -1,7 +1,28 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
+from backend_api.routers import admin_authentication, admin_operations, user_accounts, wallet, user_authentication
+from fastapi.responses import JSONResponse
+
+app = FastAPI()
+
+from fastapi import FastAPI, Request, HTTPException
 from backend_api.routers import admin_authentication, admin_operations, user_accounts, wallet, user_authentication
 
 app = FastAPI()
+
+@app.middleware("http")
+async def block_direct_backend_access(request: Request, call_next):
+    if request.url.path in ("/health", "/docs", "/openapi.json"):
+        return await call_next(request)
+
+    if request.headers.get("X-From-Proxy") != "1":
+         return JSONResponse(
+            status_code=403,
+            content={"detail": "Direct backend access blocked"}
+        )
+
+
+    return await call_next(request)
+
 
 @app.get("/health")
 def health_check():
