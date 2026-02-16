@@ -1,9 +1,14 @@
-from fastapi import APIRouter, HTTPException, Query
+
+from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel, Field, condecimal
 from typing import Optional, Literal, List
-from backend_api.db.users_store import now_iso, T_USERS, T_BANK_ACCOUNTS, T_PAYMENTS
+from sqlalchemy.orm import Session
 
-router = APIRouter(tags=["user-accounts"])
+from backend_api.db.database import get_db
+from backend_api.db.models import User, BankAccount, Payment
+from backend_api.db.audit_helper import log_bank_account_added, log_bank_account_updated, log_profile_updated
+
+router = APIRouter()
 
 # -----------------------------
 # Schemas — Users / Bank
@@ -65,16 +70,8 @@ class Merchant(BaseModel):
     merchant_id: str = Field(min_length=3, max_length=30, example="m_9001")
 
 class PaymentSummaryResponse(BaseModel):
-    id: str = Field(
-        pattern=r"^pay_\d{4,10}$",
-        example="pay_3001",
-        description="Unique payment identifier",
-    )
-    user_id: str = Field(
-        pattern=r"^u_\d{4,10}$",
-        example="u_1001",
-        description="User identifier",
-    )
+    id: str = Field(pattern=r"^pay_\d{4,10}$", example="pay_3001")
+    user_id: str = Field(pattern=r"^u_\d{4,10}$", example="u_1001")
     status: PaymentStatus = Field(example="COMPLETED")
     amount: Money
     merchant: Merchant
@@ -82,106 +79,181 @@ class PaymentSummaryResponse(BaseModel):
     created_at: str = Field(example="2026-02-08T21:56:51+00:00")
     updated_at: str = Field(example="2026-02-08T21:56:51+00:00")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "id": "pay_3001",
-                "user_id": "u_1001",
-                "status": "COMPLETED",
-                "amount": {"currency_code": "SAR", "value": "120.00"},
-                "merchant": {"name": "RASD Store", "merchant_id": "m_9001"},
-                "description": "Order #A1001",
-                "created_at": "2026-02-08T21:56:51+00:00",
-                "updated_at": "2026-02-08T21:56:51+00:00",
-            }
-        }
+# -----------------------------
+# Helper Functions
+# -----------------------------
+def generate_bank_account_id(db: Session) -> str:
+    """Generate next bank account ID"""
+    accounts = db.query(BankAccount).all()
+    if not accounts:
+        return "ba_2001"
+    
+    existing_ids = [int(acc.id.split("_")[1]) for acc in accounts if acc.id.startswith("ba_")]
+    next_id = max(existing_ids, default=2000) + 1
+    return f"ba_{next_id}"
 
 # -----------------------------
 # Endpoints — Users / Bank
 # -----------------------------
 @router.get("/users/{user_id}", response_model=UserProfileResponse)
-def view_user_profile(user_id: str):
-    user = T_USERS.get(user_id)
+def view_user_profile(user_id: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter_by(id=user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
-
-@router.patch("/users/{user_id}", response_model=UserProfileResponse)
-def update_user_profile(user_id: str, payload: UpdateProfileRequest):
-    user = T_USERS.get(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if payload.full_name is not None:
-        user["full_name"] = payload.full_name
-    if payload.phone is not None:
-        user["phone"] = payload.phone
-    if payload.city is not None:
-        user["city"] = payload.city
-
-    user["updated_at"] = now_iso()
-    return user
-
-@router.post("/users/{user_id}/bank-accounts", response_model=BankAccountResponse, status_code=201)
-def add_bank_account(user_id: str, payload: AddBankAccountRequest):
-    if user_id not in T_USERS:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if payload.is_default:
-        for acc in T_BANK_ACCOUNTS:
-            if acc["user_id"] == user_id:
-                acc["is_default"] = False
-                acc["updated_at"] = now_iso()
-
-    # Fix: Use max ID + 1 instead of length
-    existing_ids = [int(acc["id"].split("_")[1]) for acc in T_BANK_ACCOUNTS if acc["id"].startswith("ba_")]
-    next_id = max(existing_ids, default=2000) + 1
-    new_id = f"ba_{next_id}"
-    now = now_iso()
-
-    new_acc = {
-        "id": new_id,
-        "user_id": user_id,
-        "bank_name": payload.bank_name,
-        "iban": payload.iban,
-        "masked_account_number": payload.masked_account_number,
-        "currency": payload.currency,
-        "is_default": payload.is_default,
-        "created_at": now,
-        "updated_at": now,
+    
+    return {
+        "id": user.id,
+        "full_name": user.full_name,
+        "email": user.email,
+        "phone": user.phone,
+        "city": user.city,
+        "is_verified": user.is_verified,
+        "created_at": user.created_at.isoformat(),
+        "updated_at": user.updated_at.isoformat(),
     }
 
-    T_BANK_ACCOUNTS.append(new_acc)
-    return new_acc
+@router.patch("/users/{user_id}", response_model=UserProfileResponse)
+def update_user_profile(user_id: str, payload: UpdateProfileRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter_by(id=user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Track which fields changed
+    fields_changed = []
+    
+    if payload.full_name is not None:
+        user.full_name = payload.full_name
+        fields_changed.append("full_name")
+    if payload.phone is not None:
+        user.phone = payload.phone
+        fields_changed.append("phone")
+    if payload.city is not None:
+        user.city = payload.city
+        fields_changed.append("city")
+
+    db.commit()
+    db.refresh(user)
+    
+    # Log profile update
+    if fields_changed:
+        log_profile_updated(db=db, user_id=user_id, fields_changed=fields_changed)
+    
+    return {
+        "id": user.id,
+        "full_name": user.full_name,
+        "email": user.email,
+        "phone": user.phone,
+        "city": user.city,
+        "is_verified": user.is_verified,
+        "created_at": user.created_at.isoformat(),
+        "updated_at": user.updated_at.isoformat(),
+    }
+
+@router.post("/users/{user_id}/bank-accounts", response_model=BankAccountResponse, status_code=201)
+def add_bank_account(user_id: str, payload: AddBankAccountRequest, db: Session = Depends(get_db)):
+    # Check if user exists
+    user = db.query(User).filter_by(id=user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # If setting as default, unset other defaults for this user
+    if payload.is_default:
+        user_accounts = db.query(BankAccount).filter_by(user_id=user_id).all()
+        for acc in user_accounts:
+            acc.is_default = False
+
+    # Create new bank account
+    new_id = generate_bank_account_id(db)
+    new_account = BankAccount(
+        id=new_id,
+        user_id=user_id,
+        bank_name=payload.bank_name,
+        iban=payload.iban,
+        masked_account_number=payload.masked_account_number,
+        currency=payload.currency,
+        is_default=payload.is_default
+    )
+    
+    db.add(new_account)
+    db.commit()
+    db.refresh(new_account)
+    
+    # Log bank account addition
+    log_bank_account_added(db=db, user_id=user_id, bank_account_id=new_id, bank_name=payload.bank_name)
+    
+    return {
+        "id": new_account.id,
+        "user_id": new_account.user_id,
+        "bank_name": new_account.bank_name,
+        "iban": new_account.iban,
+        "masked_account_number": new_account.masked_account_number,
+        "currency": new_account.currency,
+        "is_default": new_account.is_default,
+        "created_at": new_account.created_at.isoformat(),
+        "updated_at": new_account.updated_at.isoformat(),
+    }
 
 @router.get("/users/{user_id}/bank-accounts", response_model=List[BankAccountResponse])
-def view_bank_accounts(user_id: str):
-    if user_id not in T_USERS:
+def view_bank_accounts(user_id: str, db: Session = Depends(get_db)):
+    # Check if user exists
+    user = db.query(User).filter_by(id=user_id).first()
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return [acc for acc in T_BANK_ACCOUNTS if acc["user_id"] == user_id]
+    
+    accounts = db.query(BankAccount).filter_by(user_id=user_id).all()
+    
+    return [
+        {
+            "id": acc.id,
+            "user_id": acc.user_id,
+            "bank_name": acc.bank_name,
+            "iban": acc.iban,
+            "masked_account_number": acc.masked_account_number,
+            "currency": acc.currency,
+            "is_default": acc.is_default,
+            "created_at": acc.created_at.isoformat(),
+            "updated_at": acc.updated_at.isoformat(),
+        }
+        for acc in accounts
+    ]
 
 @router.patch("/bank-accounts/{bank_account_id}", response_model=BankAccountResponse)
-def update_bank_account(bank_account_id: str, payload: UpdateBankAccountRequest):
-    acc = next((a for a in T_BANK_ACCOUNTS if a["id"] == bank_account_id), None)
+def update_bank_account(bank_account_id: str, payload: UpdateBankAccountRequest, db: Session = Depends(get_db)):
+    acc = db.query(BankAccount).filter_by(id=bank_account_id).first()
     if not acc:
         raise HTTPException(status_code=404, detail="Bank account not found")
 
     if payload.bank_name is not None:
-        acc["bank_name"] = payload.bank_name
+        acc.bank_name = payload.bank_name
     if payload.iban is not None:
-        acc["iban"] = payload.iban
+        acc.iban = payload.iban
     if payload.is_default is not None:
-        # if setting this account as default, unset others for same user
+        # If setting as default, unset others for same user
         if payload.is_default is True:
-            for other in T_BANK_ACCOUNTS:
-                if other["user_id"] == acc["user_id"] and other["id"] != acc["id"]:
-                    other["is_default"] = False
-                    other["updated_at"] = now_iso()
+            user_accounts = db.query(BankAccount).filter_by(user_id=acc.user_id).all()
+            for other in user_accounts:
+                if other.id != acc.id:
+                    other.is_default = False
+        
+        acc.is_default = payload.is_default
 
-        acc["is_default"] = payload.is_default
-
-    acc["updated_at"] = now_iso()
-    return acc
+    db.commit()
+    db.refresh(acc)
+    
+    # Log bank account update
+    log_bank_account_updated(db=db, user_id=acc.user_id, bank_account_id=bank_account_id)
+    
+    return {
+        "id": acc.id,
+        "user_id": acc.user_id,
+        "bank_name": acc.bank_name,
+        "iban": acc.iban,
+        "masked_account_number": acc.masked_account_number,
+        "currency": acc.currency,
+        "is_default": acc.is_default,
+        "created_at": acc.created_at.isoformat(),
+        "updated_at": acc.updated_at.isoformat(),
+    }
 
 # -----------------------------
 # Endpoints — Payments
@@ -192,21 +264,52 @@ def view_user_payments(
     status: Optional[PaymentStatus] = Query(default=None, description="Filter by payment status"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db)
 ):
-    if user_id not in T_USERS:
+    # Check if user exists
+    user = db.query(User).filter_by(id=user_id).first()
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user_payments = [p for p in T_PAYMENTS if p["user_id"] == user_id]
-
+    # Query payments
+    query = db.query(Payment).filter_by(user_id=user_id)
+    
     if status:
-        user_payments = [p for p in user_payments if p["status"] == status]
-
-    user_payments.sort(key=lambda x: x["created_at"], reverse=True)
-    return user_payments[offset : offset + limit]
+        query = query.filter_by(status=status)
+    
+    # Order by created_at descending
+    query = query.order_by(Payment.created_at.desc())
+    
+    # Apply pagination
+    payments = query.offset(offset).limit(limit).all()
+    
+    return [
+        {
+            "id": p.id,
+            "user_id": p.user_id,
+            "status": p.status,
+            "amount": p.amount,
+            "merchant": p.merchant,
+            "description": p.description,
+            "created_at": p.created_at.isoformat(),
+            "updated_at": p.updated_at.isoformat(),
+        }
+        for p in payments
+    ]
 
 @router.get("/payments/{payment_id}", response_model=PaymentSummaryResponse)
-def view_payment_details(payment_id: str):
-    payment = next((p for p in T_PAYMENTS if p["id"] == payment_id), None)
+def view_payment_details(payment_id: str, db: Session = Depends(get_db)):
+    payment = db.query(Payment).filter_by(id=payment_id).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
-    return payment
+    
+    return {
+        "id": payment.id,
+        "user_id": payment.user_id,
+        "status": payment.status,
+        "amount": payment.amount,
+        "merchant": payment.merchant,
+        "description": payment.description,
+        "created_at": payment.created_at.isoformat(),
+        "updated_at": payment.updated_at.isoformat(),
+    }

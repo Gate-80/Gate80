@@ -1,49 +1,38 @@
-# backend_api/routers/admin_authentication.py
 
 from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional
 from secrets import token_urlsafe
+from sqlalchemy.orm import Session
 
-from backend_api.db.users_store import now_iso
-from backend_api.db.admin_store import T_ADMINS, T_ADMIN_SESSIONS, T_ADMIN_AUDIT_LOGS
+from backend_api.db.database import get_db
+from backend_api.db.models import Admin, AdminSession
+from backend_api.db.audit_helper import log_admin_login, log_admin_logout, log_failed_action
 
 router = APIRouter(prefix="/admin/auth", tags=["admin-authentication"])
 
-# -----------------------------
-# Helpers — Admin Auth + Audit
-# -----------------------------
-def audit(event: str, admin_id: Optional[str], meta: Optional[Dict[str, Any]] = None) -> None:
-    """Helper function to create audit log entries"""
-    existing_ids = [int(log["id"].split("_")[1]) for log in T_ADMIN_AUDIT_LOGS if log["id"].startswith("aud_")]
-    next_id = max(existing_ids, default=0) + 1
-    
-    T_ADMIN_AUDIT_LOGS.append(
-        {
-            "id": f"aud_{next_id:04d}",
-            "event": event,
-            "admin_id": admin_id,
-            "meta": meta or {},
-            "created_at": now_iso(),
-        }
-    )
 
-
-def require_admin(x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token")) -> Dict[str, Any]:
+# -----------------------------
+# Helper Functions
+# -----------------------------
+def require_admin(
+    x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token"),
+    db: Session = Depends(get_db)
+) -> Admin:
     """
-    Prototype session auth:
-    - Admin logs in -> receives token
-    - Client sends `X-Admin-Token` for admin routes
-    - Token maps to a session in T_ADMIN_SESSIONS
+    Admin session authentication dependency.
+    Returns the authenticated Admin object.
     """
     if not x_admin_token:
         raise HTTPException(status_code=401, detail="Admin token required")
 
-    session = T_ADMIN_SESSIONS.get(x_admin_token)
+    # Check if session exists in database
+    session = db.query(AdminSession).filter_by(token=x_admin_token).first()
     if not session:
         raise HTTPException(status_code=401, detail="Invalid or expired admin token")
 
-    admin = T_ADMINS.get(session["admin_id"])
+    # Get admin from database
+    admin = db.query(Admin).filter_by(id=session.admin_id).first()
     if not admin:
         raise HTTPException(status_code=401, detail="Admin not found")
 
@@ -73,33 +62,59 @@ class AdminLogoutResponse(BaseModel):
 # Endpoints
 # -----------------------------
 @router.post("/sign-in", response_model=AdminSessionResponse)
-def admin_sign_in(payload: AdminLoginRequest):
+def admin_sign_in(payload: AdminLoginRequest, db: Session = Depends(get_db)):
     """Admin login endpoint - creates a session token"""
-    admin = next((a for a in T_ADMINS.values() if a["username"] == payload.username), None)
-    if not admin or admin.get("password") != payload.password:
-        audit("ADMIN_LOGIN_FAILED", admin_id=None, meta={"username": payload.username})
+    # Find admin by username
+    admin = db.query(Admin).filter_by(username=payload.username).first()
+    
+    if not admin or admin.password != payload.password:
+        # Log failed login
+        log_failed_action(
+            db=db,
+            event="ADMIN_LOGIN_FAILED",
+            actor_type="ADMIN",
+            actor_id=None,
+            error_message=f"Invalid credentials for username: {payload.username}"
+        )
         raise HTTPException(status_code=401, detail="Invalid admin credentials")
 
+    # Generate session token
     token = token_urlsafe(24)
-    session = {
+    session = AdminSession(
+        token=token,
+        admin_id=admin.id,
+        role=admin.role
+    )
+    
+    db.add(session)
+    db.commit()
+
+    # Log successful login
+    log_admin_login(db=db, admin_id=admin.id, success=True)
+
+    return {
         "token": token,
-        "admin_id": admin["id"],
-        "role": admin.get("role", "ADMIN"),
-        "created_at": now_iso(),
+        "admin_id": admin.id,
+        "role": admin.role,
+        "created_at": session.created_at.isoformat(),
     }
-    T_ADMIN_SESSIONS[token] = session
-    audit("ADMIN_LOGIN_SUCCESS", admin_id=admin["id"], meta={"role": session["role"]})
-    return session
 
 
 @router.post("/sign-out", response_model=AdminLogoutResponse)
 def admin_sign_out(
-    admin: Dict[str, Any] = Depends(require_admin),
-    x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token")
+    admin: Admin = Depends(require_admin),
+    x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token"),
+    db: Session = Depends(get_db)
 ):
     """Admin logout endpoint - invalidates the session token"""
-    # require_admin already validated token
-    if x_admin_token in T_ADMIN_SESSIONS:
-        del T_ADMIN_SESSIONS[x_admin_token]
-    audit("ADMIN_LOGOUT", admin_id=admin["id"])
+    # Remove session from database
+    if x_admin_token:
+        session = db.query(AdminSession).filter_by(token=x_admin_token).first()
+        if session:
+            db.delete(session)
+            db.commit()
+    
+    # Log logout
+    log_admin_logout(db=db, admin_id=admin.id)
+    
     return {"message": "Logged out"}
