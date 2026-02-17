@@ -40,7 +40,6 @@ It simulates common functionality found in fintech and financial applications.
 
 
 ### Available Endpoints
-The following endpoint names represent the **designed API surface** of the Digital Wallet system:
 
 #### User Accounts
 - View user profile  
@@ -76,8 +75,6 @@ The following endpoint names represent the **designed API surface** of the Digit
 - Admin sign in  
 - Admin sign out  
 
-All data is stored in-memory and uses realistic, consistent fake data for testing and experimentation.
-
 ---
 
 ## API Reference
@@ -87,53 +84,270 @@ Interactive API documentation is available through **Swagger UI** once the backe
 
 ---
 ## Technology Stack (Current Phase)
-- Framework: FastAPI (Python)
-- API Style: REST
-- Documentation: OpenAPI / Swagger
-- Server: Uvicorn
-- Storage: In-memory data structures
+
+| Component | Technology |
+|-----------|------------|
+| Framework | FastAPI (Python) |
+| API Style | REST |
+| Documentation | OpenAPI / Swagger |
+| Server | Uvicorn |
+| Database | SQLite + SQLAlchemy ORM |
+| Proxy | FastAPI Reverse Proxy (httpx) |
+
 ---
 
-## Setup & Installation
+## Architecture
 
-### 1. Environment Preparation
-- Python 3.9 or later
-- Backend implemented using FastAPI
+```
+User / Client
+     │
+     ▼
+┌─────────────────────────┐
+│   Reverse Proxy (:8080) │  ← All traffic enters here
+│   - Logs all requests   │
+│   - Forwards to backend │
+│   - Adds X-From-Proxy   │
+└───────────┬─────────────┘
+            │
+            ▼
+┌─────────────────────────┐
+│  Backend API (:8000)    │  ← Only accessible through proxy
+│  - Validates proxy header│
+│  - Processes requests   │
+│  - Logs audit events    │
+└───────────┬─────────────┘
+            │
+            ▼
+┌─────────────────────────┐
+│  SQLite Database        │  ← Persistent storage
+│  digital_wallet.db      │
+│  - Users & Sessions     │
+│  - Wallets & Transactions│
+│  - Audit Logs           │
+└─────────────────────────┘
+```
 
-### 2. Install Dependencies
-    pip install fastapi uvicorn
-
-### 3. Clone the Repository
-    git clone https://github.com/WedAbdullh/RASD_adaptive-api-deception.git
-    cd RASD_adaptive-api-deception
-
-### 4. Run the Backend Server
-From inside the backend_api directory:
-    uvicorn main:app --reload
-
-### 5. Test the API
-Swagger UI:
-    http://127.0.0.1:8000/docs
-
-Example test endpoint:
-    http://127.0.0.1:8000/hello
-
-Expected response:
-    { "message": "Hello from RASD" }
+**Security Model:**
+- The backend is completely isolated — direct access returns `403 Forbidden`
+- All requests must pass through the proxy (`X-From-Proxy: 1` header)
+- Only the `/health` endpoint is accessible directly on the backend
+- All state-changing operations are logged to the audit table
 
 ---
 
 ## Repository Structure
-    RASD_adaptive-api-deception/
-    │
-    ├── backend_api/        # Customer backend APIs
-    │   ├── main.py
-    │   ├── hello.py
-    │   └── ...
-    │
-    ├── README.md
-    └── ...
 
+```
+RASD_adaptive-api-deception/
+│
+├── backend_api/                  # Customer backend API
+│   ├── main.py                   # FastAPI app, middleware, router registration
+│   ├── db/
+│   │   ├── database.py           # SQLAlchemy engine and session setup
+│   │   ├── models.py             # ORM models (User, Wallet, Transaction, etc.)
+│   │   ├── audit_helper.py       # Audit logging helper functions
+│   │   └── seed_data.py          # Database seeding script
+│   └── routers/
+│       ├── user_authentication.py
+│       ├── admin_authentication.py
+│       ├── user_accounts.py
+│       ├── wallet.py
+│       └── admin_operations.py
+│
+├── proxy/                        # Reverse proxy layer
+│   ├── main.py                   # Transparent reverse proxy (httpx)
+│   └── __init__.py
+│
+├── dashboard/                    # Monitoring dashboard
+├── detection/                    # Anomaly detection engine
+├── decoy_api/                    # Digital-twin decoy APIs
+├── logs/                         # Request and audit logs
+├── digital_wallet.db             # SQLite database (auto-created on startup)
+├── requirements.txt              # Python dependencies
+└── README.md
+```
+
+---
+
+## Setup & Installation
+
+### Prerequisites
+- Python 3.9 or later
+- Git
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/WedAbdullh/RASD_adaptive-api-deception.git
+cd RASD_adaptive-api-deception
+```
+
+### 2. Create and Activate Virtual Environment
+
+```bash
+python -m venv venv
+source venv/bin/activate        # macOS/Linux
+venv\Scripts\activate           # Windows
+```
+
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+Or manually:
+
+```bash
+pip install fastapi uvicorn sqlalchemy httpx pydantic[email]
+```
+
+### 4. Seed the Database
+
+Populate the database with test data (users, wallets, transactions, admin):
+
+```bash
+python -m backend_api.db.seed_data
+```
+
+Expected output:
+```
+Creating database tables...
+Seeding database with test data...
+✓ Created 3 users
+✓ Created 3 bank accounts
+✓ Created 3 wallets
+✓ Created 3 transactions
+✓ Created 3 payments
+✓ Created admin account
+✅ Database seeded successfully!
+```
+
+### 5. Run the Backend Server
+
+```bash
+uvicorn backend_api.main:app --reload --port 8000
+```
+
+Expected output:
+```
+INFO:     Uvicorn running on http://127.0.0.1:8000
+✅ Database initialized
+INFO:     Application startup complete.
+```
+
+### 6. Run the Proxy Server
+
+Open a new terminal window:
+
+```bash
+source venv/bin/activate
+uvicorn proxy.main:app --reload --port 8080
+```
+
+Expected output:
+```
+INFO:     Uvicorn running on http://127.0.0.1:8080
+INFO:     Application startup complete.
+```
+
+---
+
+## Testing the API
+
+> ⚠️ **All API access must go through the proxy on port 8080.**
+> Direct backend access on port 8000 will return `403 Forbidden`.
+
+### Swagger UI
+```
+http://127.0.0.1:8080/docs
+```
+
+### Health Check
+```
+http://127.0.0.1:8000/health
+```
+Expected response:
+```json
+{ "status": "ok", "service": "digital-wallet-api" }
+```
+
+### Test Credentials
+
+| Role | Credential | Value |
+|------|-----------|-------|
+| User | Email | `user@example.com` |
+| User | Password | `password123` |
+| Admin | Username | `admin` |
+| Admin | Password | `admin123` |
+
+### Test Flow
+
+1. **Login** → `POST /api/v1/auth/sign-in` or `POST /api/v1/admin/auth/sign-in`
+2. **Copy the token** from the response
+3. **Use token** in the `X-User-Token` or `X-Admin-Token` header for protected endpoints
+4. **Test wallet operations**, admin views, etc.
+
+---
+
+## Database
+
+The system uses **SQLite** with **SQLAlchemy ORM** for persistent storage.
+
+### Database File
+```
+digital_wallet.db       ← auto-created in project root on first startup
+```
+
+### Tables
+
+| Table | Description |
+|-------|-------------|
+| `users` | Registered user accounts |
+| `wallets` | User wallets with balances |
+| `transactions` | All wallet transactions |
+| `payments` | Payment records |
+| `bank_accounts` | Linked bank accounts |
+| `user_sessions` | Active user session tokens |
+| `admin_sessions` | Active admin session tokens |
+| `admins` | Admin accounts |
+| `audit_logs` | Audit trail of all state-changing actions |
+
+### Viewing the Database
+
+**SQLite CLI:**
+```bash
+sqlite3 digital_wallet.db
+.mode column
+.headers on
+.tables
+SELECT * FROM users;
+SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 10;
+.quit
+```
+
+**VS Code:** Install the **SQLite Viewer** extension by Florian Klampfer, then click `digital_wallet.db` in the file explorer.
+
+### Audit Logging
+
+The following actions are logged to the `audit_logs` table:
+
+| Category | Events Logged |
+|----------|--------------|
+| Authentication | User/admin login, logout, failed attempts |
+| Wallet Operations | Top up, withdraw, transfer, bill payment |
+| Account Changes | Profile updates, bank account changes |
+| Admin Actions | View users, wallets, transactions |
+| Failures | Insufficient balance, invalid credentials |
+
+---
+
+## API Reference
+
+Interactive API documentation is available through Swagger UI at:
+```
+http://127.0.0.1:8080/docs
+```
 ---
 
 ## Authors
