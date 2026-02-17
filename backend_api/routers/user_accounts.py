@@ -95,7 +95,6 @@ def generate_bank_account_id(db: Session) -> str:
 # -----------------------------
 # Endpoints — Users / Bank
 # -----------------------------
-@router.get("/users/{user_id}", response_model=UserProfileResponse)
 def view_user_profile(user_id: str, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(id=user_id).first()
     if not user:
@@ -112,7 +111,6 @@ def view_user_profile(user_id: str, db: Session = Depends(get_db)):
         "updated_at": user.updated_at.isoformat(),
     }
 
-@router.patch("/users/{user_id}", response_model=UserProfileResponse)
 def update_user_profile(user_id: str, payload: UpdateProfileRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(id=user_id).first()
     if not user:
@@ -149,7 +147,6 @@ def update_user_profile(user_id: str, payload: UpdateProfileRequest, db: Session
         "updated_at": user.updated_at.isoformat(),
     }
 
-@router.post("/users/{user_id}/bank-accounts", response_model=BankAccountResponse, status_code=201)
 def add_bank_account(user_id: str, payload: AddBankAccountRequest, db: Session = Depends(get_db)):
     # Check if user exists
     user = db.query(User).filter_by(id=user_id).first()
@@ -193,7 +190,6 @@ def add_bank_account(user_id: str, payload: AddBankAccountRequest, db: Session =
         "updated_at": new_account.updated_at.isoformat(),
     }
 
-@router.get("/users/{user_id}/bank-accounts", response_model=List[BankAccountResponse])
 def view_bank_accounts(user_id: str, db: Session = Depends(get_db)):
     # Check if user exists
     user = db.query(User).filter_by(id=user_id).first()
@@ -217,7 +213,6 @@ def view_bank_accounts(user_id: str, db: Session = Depends(get_db)):
         for acc in accounts
     ]
 
-@router.patch("/bank-accounts/{bank_account_id}", response_model=BankAccountResponse)
 def update_bank_account(bank_account_id: str, payload: UpdateBankAccountRequest, db: Session = Depends(get_db)):
     acc = db.query(BankAccount).filter_by(id=bank_account_id).first()
     if not acc:
@@ -258,13 +253,12 @@ def update_bank_account(bank_account_id: str, payload: UpdateBankAccountRequest,
 # -----------------------------
 # Endpoints — Payments
 # -----------------------------
-@router.get("/users/{user_id}/payments", response_model=List[PaymentSummaryResponse])
 def view_user_payments(
     user_id: str,
     status: Optional[PaymentStatus] = Query(default=None, description="Filter by payment status"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     # Check if user exists
     user = db.query(User).filter_by(id=user_id).first()
@@ -297,7 +291,6 @@ def view_user_payments(
         for p in payments
     ]
 
-@router.get("/payments/{payment_id}", response_model=PaymentSummaryResponse)
 def view_payment_details(payment_id: str, db: Session = Depends(get_db)):
     payment = db.query(Payment).filter_by(id=payment_id).first()
     if not payment:

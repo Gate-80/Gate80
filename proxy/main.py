@@ -1,9 +1,15 @@
+# proxy/main.py
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 import httpx
 import time, uuid
 
-app = FastAPI()
+# Disable Swagger UI on proxy - it's just a transparent forwarder
+app = FastAPI(
+    docs_url=None,      # Disable /docs
+    redoc_url=None,     # Disable /redoc
+    openapi_url=None    # Disable /openapi.json
+)
 
 BACKEND_URL = "http://127.0.0.1:8000"
 
