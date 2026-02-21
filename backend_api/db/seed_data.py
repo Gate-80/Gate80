@@ -69,6 +69,17 @@ def seed_database():
                 created_at=datetime(2026, 2, 8, 21, 56, 51, tzinfo=timezone.utc),
                 updated_at=datetime(2026, 2, 8, 21, 56, 51, tzinfo=timezone.utc),
             ),
+            User(
+                id="u_1004",
+                full_name="Test User",
+                email="user@example.com",
+                password="password123",
+                phone="+9665XXXXXXX",
+                city="Jeddah",
+                is_verified=True,
+                created_at=datetime(2026, 2, 8, 21, 56, 51, tzinfo=timezone.utc),
+                updated_at=datetime(2026, 2, 8, 21, 56, 51, tzinfo=timezone.utc),
+            ),
         ]
         db.add_all(users)
         print(f"✓ Created {len(users)} users")
@@ -110,6 +121,17 @@ def seed_database():
                 created_at=datetime(2026, 2, 8, 21, 56, 51, tzinfo=timezone.utc),
                 updated_at=datetime(2026, 2, 8, 21, 56, 51, tzinfo=timezone.utc),
             ),
+            BankAccount(
+                id="ba_2004",
+                user_id="u_1004",
+                bank_name="Al Rajhi Bank",
+                iban="SA4420000001234567891299",
+                masked_account_number="**** **** **** 1299",
+                currency="SAR",
+                is_default=True,
+                created_at=datetime(2026, 2, 8, 21, 56, 51, tzinfo=timezone.utc),
+                updated_at=datetime(2026, 2, 8, 21, 56, 51, tzinfo=timezone.utc),
+            ),
         ]
         db.add_all(bank_accounts)
         print(f"✓ Created {len(bank_accounts)} bank accounts")
@@ -144,6 +166,15 @@ def seed_database():
                 status=WalletStatus.FROZEN,
                 created_at=datetime(2026, 2, 10, 13, 20, 0, tzinfo=timezone.utc),
                 updated_at=datetime(2026, 2, 12, 19, 5, 0, tzinfo=timezone.utc),
+            ),
+            Wallet(
+                id="w_5004",
+                user_id="u_1004",
+                currency_code="SAR",
+                balance="500.00",
+                status=WalletStatus.ACTIVE,
+                created_at=datetime(2026, 2, 8, 22, 0, 0, tzinfo=timezone.utc),
+                updated_at=datetime(2026, 2, 8, 22, 0, 0, tzinfo=timezone.utc),
             ),
         ]
         db.add_all(wallets)
@@ -237,7 +268,7 @@ def seed_database():
         admin = Admin(
             id="a_0001",
             username="admin",
-            password="admin123",  # In production: hash this
+            password="admin123",  # In production hash this
             role="SUPER_ADMIN",
             created_at=datetime(2026, 2, 1, 10, 0, 0, tzinfo=timezone.utc),
             updated_at=datetime(2026, 2, 1, 10, 0, 0, tzinfo=timezone.utc),
@@ -249,7 +280,7 @@ def seed_database():
         db.commit()
         print("\n✅ Database seeded successfully!")
         print("\nTest credentials:")
-        print("  User: taif.alsaadi@gmail.com / password123")
+        print("  User: user@example.com / password123")
         print("  Admin: admin / admin123")
         
     except Exception as e:
