@@ -97,34 +97,35 @@ Interactive API documentation is available through **Swagger UI** once the backe
 ---
 
 ## Architecture
-
 ```
 User / Client
      │
      ▼
-┌─────────────────────────┐
-│   Reverse Proxy (:8080) │  ← All traffic enters here
-│   - Logs all requests   │
-│   - Forwards to backend │
-│   - Adds X-From-Proxy   │
-└───────────┬─────────────┘
-            │
-            ▼
-┌─────────────────────────┐
-│  Backend API (:8000)    │  ← Only accessible through proxy
-│  - Validates proxy header│
-│  - Processes requests   │
-│  - Logs audit events    │
-└───────────┬─────────────┘
-            │
-            ▼
-┌─────────────────────────┐
-│  SQLite Database        │  ← Persistent storage
-│  digital_wallet.db      │
-│  - Users & Sessions     │
-│  - Wallets & Transactions│
-│  - Audit Logs           │
-└─────────────────────────┘
+┌────────────────────────────────────┐
+│   Reverse Proxy (:8080)            │  ← All traffic enters here
+│   - Logs to proxy_logs.db          │
+│   - Forwards to backend            │
+│   - Adds X-From-Proxy              │
+└─────────────────┬──────────────────┘
+                  │
+                  ▼
+┌────────────────────────────────────┐
+│   Backend API (:8000)              │  ← Only accessible through proxy
+│   - Validates proxy header         │
+│   - Processes requests             │
+│   - Logs to digital_wallet.db      │
+└─────────────────┬──────────────────┘
+                  │
+                  ▼
+┌────────────────────────────────────┐
+│   Two Separate Databases           │
+├────────────────────────────────────┤
+│  digital_wallet.db                 │
+│  └─ Customer data & audit          │
+│                                    │
+│  proxy_logs.db                     │
+│  └─ RASD traffic logs              │
+└────────────────────────────────────┘
 ```
 
 **Security Model:**
@@ -156,13 +157,17 @@ RASD_adaptive-api-deception/
 │
 ├── proxy/                        # Reverse proxy layer
 │   ├── main.py                   # Transparent reverse proxy (httpx)
+│   ├── db/
+│   │   ├── database.py           # Proxy database connection
+│   │   ├── models.py             # ProxyRequest model
+│   │   └── logger.py             # Request logging helper
 │   └── __init__.py
 │
 ├── dashboard/                    # Monitoring dashboard
 ├── detection/                    # Anomaly detection engine
 ├── decoy_api/                    # Digital-twin decoy APIs
-├── logs/                         # Request and audit logs
-├── digital_wallet.db             # SQLite database (auto-created on startup)
+├── digital_wallet.db             # Backend database (auto-created on startup)
+├── proxy_logs.db                 # Proxy logs database (auto-created on startup)
 ├── requirements.txt              # Python dependencies
 └── README.md
 ```
@@ -292,14 +297,18 @@ Expected response:
 
 ## Database
 
-The system uses **SQLite** with **SQLAlchemy ORM** for persistent storage.
+The system uses **SQLite** with **SQLAlchemy ORM** for persistent storage across two separate databases.
 
-### Database File
+### Database Files
+
+Both databases are auto-created in the project root on first startup:
 ```
-digital_wallet.db       ← auto-created in project root on first startup
+digital_wallet.db       ← Customer backend API data
+proxy_logs.db          ← RASD proxy traffic logs
 ```
 
-### Tables
+### 1. Backend API Database (`digital_wallet.db`)
+Customer application data - managed by the backend API.
 
 | Table | Description |
 |-------|-------------|
@@ -311,34 +320,78 @@ digital_wallet.db       ← auto-created in project root on first startup
 | `user_sessions` | Active user session tokens |
 | `admin_sessions` | Active admin session tokens |
 | `admins` | Admin accounts |
-| `audit_logs` | Audit trail of all state-changing actions |
+| `audit_logs` | Audit trail of backend operations |
 
-### Viewing the Database
+### 2. Proxy Logs Database (`proxy_logs.db`)
+RASD system logs - captures all HTTP traffic through the proxy for anomaly detection and security monitoring.
+
+| Table | Description |
+|-------|-------------|
+| `proxy_requests` | Complete log of all HTTP requests passing through the reverse proxy |
+
+**Schema - All Logged Fields:**
+
+| Field | Type | Description | Example |
+|-------|------|-------------|---------|
+| `id` | Integer | Auto-incrementing primary key | `1`, `2`, `3` |
+| `request_id` | String | Unique UUID for each request | `a1b2c3d4-e5f6-...` |
+| `timestamp` | DateTime | When request was received | `2026-02-17 10:30:45` |
+| `client_ip` | String | Client IP address (supports X-Forwarded-For) | `192.168.1.100` |
+| `method` | String | HTTP method | `GET`, `POST`, `PUT`, `DELETE` |
+| `path` | String | Request URL path | `/api/v1/auth/sign-in` |
+| `query_params` | JSON | URL query parameters | `{"limit": 10, "offset": 0}` |
+| `headers` | JSON | Request headers (auth tokens redacted) | `{"user-agent": "...", "x-user-token": "***REDACTED***"}` |
+| `body` | Text | Request body (max 10KB) | `{"email": "user@example.com"}` |
+| `response_status` | Integer | HTTP response status code | `200`, `403`, `500` |
+| `response_time_ms` | Integer | Response time in milliseconds | `45`, `1203` |
+| `forwarded_to_backend` | Boolean | Whether request was forwarded to backend | `true`, `false` |
+| `backend_error` | String | Error message if backend unreachable | `"Backend unavailable"`, `"Timeout"` |
+| `flagged_as_suspicious` | Boolean | Marked as suspicious by detection engine | `false` *(future use)* |
+| `suspicion_reason` | String | Reason for flagging | `null` *(future use)* |
+| `created_at` | DateTime | Database record creation timestamp | `2026-02-17 10:30:45` |
+
+**Note:** Fields marked for future use (suspicious flags) currently have default values and will be populated when the anomaly detection engine is integrated.
+
+**Security Features:**
+- Authentication tokens are automatically redacted (`***REDACTED***`)
+- Request body size limited to 10KB to prevent database bloat
+- All timestamps use UTC timezone
+
+
+### Viewing the Databases
 
 **SQLite CLI:**
 ```bash
+# Backend database
 sqlite3 digital_wallet.db
 .mode column
 .headers on
-.tables
 SELECT * FROM users;
 SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 10;
 .quit
+
+# Proxy logs
+sqlite3 proxy_logs.db
+SELECT * FROM proxy_requests ORDER BY timestamp DESC LIMIT 10;
+.quit
 ```
 
-**VS Code:** Install the **SQLite Viewer** extension by Florian Klampfer, then click `digital_wallet.db` in the file explorer.
+**VS Code:** Install the **SQLite Viewer** extension by Florian Klampfer, then click the `.db` files in the file explorer.
 
 ### Audit Logging
 
-The following actions are logged to the `audit_logs` table:
+#### **Backend Audit Logs** (`digital_wallet.db` → `audit_logs` table)
+
+Tracks all state-changing operations within the customer API:
 
 | Category | Events Logged |
 |----------|--------------|
-| Authentication | User/admin login, logout, failed attempts |
-| Wallet Operations | Top up, withdraw, transfer, bill payment |
-| Account Changes | Profile updates, bank account changes |
-| Admin Actions | View users, wallets, transactions |
-| Failures | Insufficient balance, invalid credentials |
+| Authentication | User/admin login, logout, failed login attempts |
+| Wallet Operations | Top up, withdraw, user-to-user transfer, bill payment |
+| Account Changes | Profile updates, bank account addition/modification |
+| Admin Actions | Admin viewing users, wallets, transactions |
+| Failures | Insufficient balance, invalid credentials, unauthorized access |
+
 
 ---
 
