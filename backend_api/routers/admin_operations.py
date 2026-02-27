@@ -19,9 +19,9 @@ CurrencyCode = Literal["SAR", "USD", "EUR"]
 MoneyValue = condecimal(max_digits=12, decimal_places=2)
 
 class AdminUserResponse(BaseModel):
-    id: str = Field(example="u_1001")
-    full_name: str = Field(example="Taif Alsaadi")
-    email: str = Field(example="taif.alsaadi@gmail.com")
+    id: str = Field(example="u_1004")
+    full_name: str = Field(example="Test User")
+    email: str = Field(example="user@example.com")
     phone: str = Field(example="+9665XXXXXXX")
     city: str = Field(example="Jeddah")
     is_verified: bool = Field(example=True)

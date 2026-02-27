@@ -1,6 +1,7 @@
 # Database connection & sessionpip install sqlalchemy
 
-
+import os
+import stat
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
@@ -9,6 +10,7 @@ from typing import Generator
 # SQLite database URL
 # Creates digital_wallet.db file in the project root
 SQLALCHEMY_DATABASE_URL = "sqlite:///./digital_wallet.db"
+DB_PATH = "./digital_wallet.db"
 
 # Create engine
 # connect_args={"check_same_thread": False} is needed only for SQLite
@@ -23,12 +25,10 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # Base class for models
 Base = declarative_base()
 
-
 # Dependency to get database session
 def get_db() -> Generator[Session, None, None]:
     """
     Database session dependency for FastAPI endpoints.
-    
     Usage:
         @router.get("/users")
         def get_users(db: Session = Depends(get_db)):
@@ -41,10 +41,18 @@ def get_db() -> Generator[Session, None, None]:
     finally:
         db.close()
 
-
 def init_db():
     """
     Initialize database - create all tables.
     Call this once when starting the application.
     """
     Base.metadata.create_all(bind=engine)
+    
+    # Fix file permissions so any user can read/write to prevent readonly errors across different 
+    # environments (e.g. if DB was created with sudo or by a different user).
+    if os.path.exists(DB_PATH):
+        os.chmod(DB_PATH, 
+            stat.S_IRUSR | stat.S_IWUSR |  # owner read/write
+            stat.S_IRGRP | stat.S_IWGRP |  # group read/write
+            stat.S_IROTH | stat.S_IWOTH    # others read/write
+        )
