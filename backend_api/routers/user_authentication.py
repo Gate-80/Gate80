@@ -54,30 +54,30 @@ def require_user(
 # Schemas
 # -----------------------------
 class UserSignUpRequest(BaseModel):
-    full_name: str = Field(min_length=3, max_length=60, example="Taif Alsaadi")
-    email: EmailStr = Field(example="taif.alsaadi@gmail.com")
-    password: str = Field(min_length=8, max_length=80, example="SecurePass123!")
+    full_name: str = Field(min_length=3, max_length=60, example="Test User")
+    email: EmailStr = Field(example="user@example.com")
+    password: str = Field(min_length=8, max_length=80, example="password123")
     phone: str = Field(min_length=8, max_length=20, example="+9665XXXXXXX")
     city: str = Field(min_length=2, max_length=60, example="Jeddah")
 
 
 class UserSignInRequest(BaseModel):
-    email: EmailStr = Field(example="taif.alsaadi@gmail.com")
-    password: str = Field(min_length=8, max_length=80, example="SecurePass123!")
+    email: EmailStr = Field(example="user@example.com")
+    password: str = Field(min_length=8, max_length=80, example="password123")
 
 
 class UserSessionResponse(BaseModel):
     token: str = Field(example="some_token_value")
-    user_id: str = Field(example="u_1001")
-    full_name: str = Field(example="Taif Alsaadi")
-    email: str = Field(example="taif.alsaadi@gmail.com")
+    user_id: str = Field(example="u_1004")
+    full_name: str = Field(example="Test User")
+    email: str = Field(example="user@example.com")
     created_at: str = Field(example="2026-02-13T00:00:00+00:00")
 
 
 class UserSignUpResponse(BaseModel):
     user_id: str = Field(example="u_1004")
-    full_name: str = Field(example="Taif Alsaadi")
-    email: str = Field(example="taif.alsaadi@gmail.com")
+    full_name: str = Field(example="Test User")
+    email: str = Field(example="user@example.com")
     message: str = Field(example="User registered successfully")
 
 
