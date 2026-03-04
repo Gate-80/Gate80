@@ -1,216 +1,253 @@
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, condecimal, Field
-from decimal import Decimal
+from fastapi import APIRouter, HTTPException, Query, Depends
+from pydantic import BaseModel, Field, condecimal
+from typing import Optional, Literal, List
 from sqlalchemy.orm import Session
 
 from backend_api.db.database import get_db
-from backend_api.db.models import User, Wallet, Transaction, TransactionType, TransactionStatus
-from backend_api.db.audit_helper import (
-    log_wallet_topup, 
-    log_wallet_withdraw, 
-    log_user_transfer, 
-    log_bill_payment,
-    log_failed_action
-)
+from backend_api.db.models import User, BankAccount, Payment
+from backend_api.db.audit_helper import log_bank_account_added, log_bank_account_updated, log_profile_updated
+from backend_api.routers.user_authentication import require_user
 
 router = APIRouter()
 
 # -----------------------------
-# Schemas
+# Schemas — Users / Bank
 # -----------------------------
-class WalletBalanceResponse(BaseModel):
-    user_id: str
-    balance: str
-    currency: str
+class UserProfileResponse(BaseModel):
+    id: str = Field(example="u_1004")
+    full_name: str = Field(min_length=3, max_length=60, example="Test User")
+    email: str = Field(example="user@example.com")
+    phone: str = Field(max_length=20, example="+9665XXXXXXX")
+    city: str = Field(example="Jeddah")
+    is_verified: bool = Field(example=True)
+    created_at: str = Field(example="2026-02-08T21:56:51+00:00")
+    updated_at: str = Field(example="2026-02-08T21:56:51+00:00")
 
+class UpdateProfileRequest(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=2, max_length=80, example="Test User")
+    phone: Optional[str] = Field(None, min_length=8, max_length=20, example="+9665XXXXXXX")
+    city: Optional[str] = Field(None, min_length=2, max_length=60, example="Jeddah")
 
-class WalletAmountRequest(BaseModel):
-    amount: condecimal(max_digits=10, decimal_places=2)
+BankCurrency = Literal["SAR", "USD"]
 
+class AddBankAccountRequest(BaseModel):
+    bank_name: str = Field(min_length=2, max_length=60, example="Al Rajhi Bank")
+    iban: str = Field(min_length=10, max_length=34, example="SA4420000001234567891299")
+    masked_account_number: str = Field(min_length=8, max_length=30, example="**** **** **** 1299")
+    currency: BankCurrency = Field(default="SAR", example="SAR")
+    is_default: bool = Field(default=False, example=False)
+
+class BankAccountResponse(BaseModel):
+    id: str = Field(example="ba_2004")
+    user_id: str = Field(example="u_1004")
+    bank_name: str = Field(example="Al Rajhi Bank")
+    iban: str = Field(min_length=10, max_length=34, example="SA4420000001234567891299")
+    masked_account_number: str = Field(example="**** **** **** 1299")
+    currency: BankCurrency = Field(default="SAR", example="SAR")
+    is_default: bool = Field(example=True)
+    created_at: str = Field(example="2026-02-08T21:56:51+00:00")
+    updated_at: str = Field(example="2026-02-08T21:56:51+00:00")
+
+class UpdateBankAccountRequest(BaseModel):
+    bank_name: Optional[str] = Field(None, min_length=2, max_length=60, example="Al Rajhi Bank")
+    iban: Optional[str] = Field(None, min_length=10, max_length=34, example="SA4420000001234567891299")
+    is_default: Optional[bool] = Field(default=None, example=True)
+
+# -----------------------------
+# Schemas — Payments
+# -----------------------------
+CurrencyCode = Literal["SAR", "USD", "EUR"]
+PaymentStatus = Literal["CREATED", "AUTHORIZED", "COMPLETED", "FAILED", "CANCELLED"]
+MoneyValue = condecimal(max_digits=10, decimal_places=2)
+
+class Money(BaseModel):
+    currency_code: CurrencyCode = Field(default="SAR", example="SAR")
+    value: MoneyValue = Field(example="120.00")
+
+class Merchant(BaseModel):
+    name: str = Field(min_length=2, max_length=60, example="RASD Store")
+    merchant_id: str = Field(min_length=3, max_length=30, example="m_9001")
+
+class PaymentSummaryResponse(BaseModel):
+    id: str = Field(pattern=r"^pay_\d{4,10}$", example="pay_3001")
+    user_id: str = Field(pattern=r"^u_\d{4,10}$", example="u_1004")
+    status: PaymentStatus = Field(example="COMPLETED")
+    amount: Money
+    merchant: Merchant
+    description: Optional[str] = Field(default=None, max_length=120, example="Order #A1001")
+    created_at: str = Field(example="2026-02-08T21:56:51+00:00")
+    updated_at: str = Field(example="2026-02-08T21:56:51+00:00")
 
 # -----------------------------
 # Helper Functions
 # -----------------------------
-def get_wallet_or_404(db: Session, user_id: str) -> Wallet:
-    wallet = db.query(Wallet).filter_by(user_id=user_id).first()
-    if not wallet:
-        raise HTTPException(status_code=404, detail="Wallet not found")
-    return wallet
+def generate_bank_account_id(db: Session) -> str:
+    accounts = db.query(BankAccount).all()
+    if not accounts:
+        return "ba_2001"
+    existing_ids = [int(acc.id.split("_")[1]) for acc in accounts if acc.id.startswith("ba_")]
+    next_id = max(existing_ids, default=2000) + 1
+    return f"ba_{next_id}"
 
+# -----------------------------
+# Endpoints — Users / Bank
+# -----------------------------
+@router.get("/users/{user_id}", response_model=UserProfileResponse, tags=["user-accounts"])
+def view_user_profile(user_id: str, db: Session = Depends(get_db)):
+    """View user profile"""
+    user = db.query(User).filter_by(id=user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {
+        "id": user.id, "full_name": user.full_name, "email": user.email,
+        "phone": user.phone, "city": user.city, "is_verified": user.is_verified,
+        "created_at": user.created_at.isoformat(), "updated_at": user.updated_at.isoformat(),
+    }
 
-def ensure_user_exists(db: Session, user_id: str):
+@router.put("/users/{user_id}", response_model=UserProfileResponse, tags=["user-accounts"])
+def update_user_profile(user_id: str, payload: UpdateProfileRequest, db: Session = Depends(get_db)):
+    """Update user profile"""
     user = db.query(User).filter_by(id=user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    fields_changed = []
+    if payload.full_name is not None:
+        user.full_name = payload.full_name
+        fields_changed.append("full_name")
+    if payload.phone is not None:
+        user.phone = payload.phone
+        fields_changed.append("phone")
+    if payload.city is not None:
+        user.city = payload.city
+        fields_changed.append("city")
 
-def generate_transaction_id(db: Session) -> str:
-    transactions = db.query(Transaction).all()
-    if not transactions:
-        return "tx_7001"
-    existing_ids = [int(tx.id.split("_")[1]) for tx in transactions if tx.id.startswith("tx_")]
-    next_id = max(existing_ids, default=7000) + 1
-    return f"tx_{next_id}"
+    db.commit()
+    db.refresh(user)
+    if fields_changed:
+        log_profile_updated(db=db, user_id=user_id, fields_changed=fields_changed)
 
-
-def create_transaction(
-    db: Session,
-    user_id: str,
-    wallet_id: str,
-    tx_type: TransactionType,
-    amount: Decimal,
-    currency_code: str,
-    counterparty_kind: str,
-    counterparty_ref: str,
-    description: str,
-    status: TransactionStatus = TransactionStatus.COMPLETED
-) -> Transaction:
-    new_id = generate_transaction_id(db)
-    transaction = Transaction(
-        id=new_id,
-        user_id=user_id,
-        wallet_id=wallet_id,
-        type=tx_type,
-        status=status,
-        amount={"currency_code": currency_code, "value": str(amount)},
-        counterparty={"kind": counterparty_kind, "ref": counterparty_ref},
-        description=description
-    )
-    db.add(transaction)
-    return transaction
-
-
-# -----------------------------
-# Endpoints
-# -----------------------------
-@router.get("/users/{user_id}/wallet", response_model=WalletBalanceResponse, tags=["wallet"])
-def view_wallet_balance(user_id: str, db: Session = Depends(get_db)):
-    """View wallet balance for a user"""
-    ensure_user_exists(db, user_id)
-    wallet = get_wallet_or_404(db, user_id)
     return {
-        "user_id": user_id,
-        "balance": wallet.balance,
-        "currency": wallet.currency_code,
+        "id": user.id, "full_name": user.full_name, "email": user.email,
+        "phone": user.phone, "city": user.city, "is_verified": user.is_verified,
+        "created_at": user.created_at.isoformat(), "updated_at": user.updated_at.isoformat(),
     }
 
+@router.post("/users/{user_id}/bank-accounts", response_model=BankAccountResponse, status_code=201, tags=["user-accounts"])
+def add_bank_account(user_id: str, payload: AddBankAccountRequest, db: Session = Depends(get_db)):
+    """Add a bank account for a user"""
+    user = db.query(User).filter_by(id=user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-@router.post("/users/{user_id}/wallet/topup", tags=["wallet"])
-def topup_wallet(user_id: str, payload: WalletAmountRequest, db: Session = Depends(get_db)):
-    """Top up wallet balance"""
-    ensure_user_exists(db, user_id)
-    wallet = get_wallet_or_404(db, user_id)
+    if payload.is_default:
+        for acc in db.query(BankAccount).filter_by(user_id=user_id).all():
+            acc.is_default = False
 
-    amount = Decimal(str(payload.amount))
-    current_balance = Decimal(str(wallet.balance))
-    new_balance = current_balance + amount
-    wallet.balance = str(new_balance)
-
-    create_transaction(
-        db=db, user_id=user_id, wallet_id=wallet.id,
-        tx_type=TransactionType.TOPUP, amount=amount,
-        currency_code=wallet.currency_code,
-        counterparty_kind="CARD", counterparty_ref="card_****_0000",
-        description="Top up via card", status=TransactionStatus.COMPLETED
+    new_id = generate_bank_account_id(db)
+    new_account = BankAccount(
+        id=new_id, user_id=user_id, bank_name=payload.bank_name,
+        iban=payload.iban, masked_account_number=payload.masked_account_number,
+        currency=payload.currency, is_default=payload.is_default
     )
+    db.add(new_account)
     db.commit()
-    db.refresh(wallet)
-    log_wallet_topup(db=db, user_id=user_id, wallet_id=wallet.id, amount=str(amount), currency=wallet.currency_code)
+    db.refresh(new_account)
+    log_bank_account_added(db=db, user_id=user_id, bank_account_id=new_id, bank_name=payload.bank_name)
 
-    return {"message": "Wallet topped up", "new_balance": wallet.balance, "currency": wallet.currency_code}
+    return {
+        "id": new_account.id, "user_id": new_account.user_id, "bank_name": new_account.bank_name,
+        "iban": new_account.iban, "masked_account_number": new_account.masked_account_number,
+        "currency": new_account.currency, "is_default": new_account.is_default,
+        "created_at": new_account.created_at.isoformat(), "updated_at": new_account.updated_at.isoformat(),
+    }
 
+@router.get("/users/{user_id}/bank-accounts", response_model=List[BankAccountResponse], tags=["user-accounts"])
+def view_bank_accounts(user_id: str, db: Session = Depends(get_db)):
+    """View all bank accounts for a user"""
+    user = db.query(User).filter_by(id=user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-@router.post("/users/{user_id}/wallet/withdraw", tags=["wallet"])
-def withdraw_wallet(user_id: str, payload: WalletAmountRequest, db: Session = Depends(get_db)):
-    """Withdraw funds from wallet"""
-    ensure_user_exists(db, user_id)
-    wallet = get_wallet_or_404(db, user_id)
+    accounts = db.query(BankAccount).filter_by(user_id=user_id).all()
+    return [
+        {
+            "id": acc.id, "user_id": acc.user_id, "bank_name": acc.bank_name,
+            "iban": acc.iban, "masked_account_number": acc.masked_account_number,
+            "currency": acc.currency, "is_default": acc.is_default,
+            "created_at": acc.created_at.isoformat(), "updated_at": acc.updated_at.isoformat(),
+        }
+        for acc in accounts
+    ]
 
-    amount = Decimal(str(payload.amount))
-    current_balance = Decimal(str(wallet.balance))
+@router.put("/users/{user_id}/bank-accounts/{bank_account_id}", response_model=BankAccountResponse, tags=["user-accounts"])
+def update_bank_account(user_id: str, bank_account_id: str, payload: UpdateBankAccountRequest, db: Session = Depends(get_db)):
+    """Update a bank account"""
+    acc = db.query(BankAccount).filter_by(id=bank_account_id).first()
+    if not acc:
+        raise HTTPException(status_code=404, detail="Bank account not found")
 
-    if current_balance < amount:
-        log_failed_action(db=db, event="WALLET_WITHDRAW_FAILED", actor_type="USER", actor_id=user_id, error_message="Insufficient balance")
-        raise HTTPException(status_code=400, detail="Insufficient balance")
+    if payload.bank_name is not None:
+        acc.bank_name = payload.bank_name
+    if payload.iban is not None:
+        acc.iban = payload.iban
+    if payload.is_default is True:
+        for other in db.query(BankAccount).filter_by(user_id=acc.user_id).all():
+            if other.id != acc.id:
+                other.is_default = False
+    if payload.is_default is not None:
+        acc.is_default = payload.is_default
 
-    wallet.balance = str(current_balance - amount)
-
-    create_transaction(
-        db=db, user_id=user_id, wallet_id=wallet.id,
-        tx_type=TransactionType.WITHDRAW, amount=amount,
-        currency_code=wallet.currency_code,
-        counterparty_kind="BANK", counterparty_ref="bank_account",
-        description="Withdraw to bank account", status=TransactionStatus.COMPLETED
-    )
     db.commit()
-    db.refresh(wallet)
-    log_wallet_withdraw(db=db, user_id=user_id, wallet_id=wallet.id, amount=str(amount), currency=wallet.currency_code)
+    db.refresh(acc)
+    log_bank_account_updated(db=db, user_id=acc.user_id, bank_account_id=bank_account_id)
 
-    return {"message": "Withdraw successful", "new_balance": wallet.balance, "currency": wallet.currency_code}
+    return {
+        "id": acc.id, "user_id": acc.user_id, "bank_name": acc.bank_name,
+        "iban": acc.iban, "masked_account_number": acc.masked_account_number,
+        "currency": acc.currency, "is_default": acc.is_default,
+        "created_at": acc.created_at.isoformat(), "updated_at": acc.updated_at.isoformat(),
+    }
 
+# -----------------------------
+# Endpoints — Payments
+# -----------------------------
+@router.get("/users/{user_id}/payments", response_model=List[PaymentSummaryResponse], tags=["user-accounts"])
+def view_user_payments(
+    user_id: str,
+    status: Optional[PaymentStatus] = Query(default=None, description="Filter by payment status"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """View all payments for a user"""
+    user = db.query(User).filter_by(id=user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-@router.post("/users/{user_id}/wallet/transfer/{target_user_id}", tags=["wallet"])
-def transfer_to_user(user_id: str, target_user_id: str, payload: WalletAmountRequest, db: Session = Depends(get_db)):
-    """Transfer funds to another user"""
-    ensure_user_exists(db, user_id)
-    ensure_user_exists(db, target_user_id)
+    query = db.query(Payment).filter_by(user_id=user_id)
+    if status:
+        query = query.filter_by(status=status)
+    payments = query.order_by(Payment.created_at.desc()).offset(offset).limit(limit).all()
 
-    if user_id == target_user_id:
-        log_failed_action(db=db, event="USER_TRANSFER_FAILED", actor_type="USER", actor_id=user_id, error_message="Cannot transfer to yourself")
-        raise HTTPException(status_code=400, detail="Cannot transfer to yourself")
+    return [
+        {
+            "id": p.id, "user_id": p.user_id, "status": p.status,
+            "amount": p.amount, "merchant": p.merchant, "description": p.description,
+            "created_at": p.created_at.isoformat(), "updated_at": p.updated_at.isoformat(),
+        }
+        for p in payments
+    ]
 
-    sender_wallet = get_wallet_or_404(db, user_id)
-    receiver_wallet = get_wallet_or_404(db, target_user_id)
+@router.get("/users/{user_id}/payments/{payment_id}", response_model=PaymentSummaryResponse, tags=["user-accounts"])
+def view_payment_details(user_id: str, payment_id: str, db: Session = Depends(get_db)):
+    """View payment details"""
+    payment = db.query(Payment).filter_by(id=payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
 
-    amount = Decimal(str(payload.amount))
-    sender_balance = Decimal(str(sender_wallet.balance))
-    receiver_balance = Decimal(str(receiver_wallet.balance))
-
-    if sender_balance < amount:
-        log_failed_action(db=db, event="USER_TRANSFER_FAILED", actor_type="USER", actor_id=user_id, error_message="Insufficient balance")
-        raise HTTPException(status_code=400, detail="Insufficient balance")
-
-    sender_wallet.balance = str(sender_balance - amount)
-    receiver_wallet.balance = str(receiver_balance + amount)
-
-    create_transaction(
-        db=db, user_id=user_id, wallet_id=sender_wallet.id,
-        tx_type=TransactionType.TRANSFER_USER, amount=amount,
-        currency_code=sender_wallet.currency_code,
-        counterparty_kind="USER", counterparty_ref=target_user_id,
-        description=f"Transfer to user {target_user_id}", status=TransactionStatus.COMPLETED
-    )
-    db.commit()
-    db.refresh(sender_wallet)
-    log_user_transfer(db=db, user_id=user_id, wallet_id=sender_wallet.id, amount=str(amount), to_user=target_user_id)
-
-    return {"message": "Transfer successful", "new_balance": sender_wallet.balance, "currency": sender_wallet.currency_code}
-
-
-@router.post("/users/{user_id}/wallet/pay-bill", tags=["wallet"])
-def pay_bill(user_id: str, payload: WalletAmountRequest, db: Session = Depends(get_db)):
-    """Pay a bill from wallet"""
-    ensure_user_exists(db, user_id)
-    wallet = get_wallet_or_404(db, user_id)
-
-    amount = Decimal(str(payload.amount))
-    current_balance = Decimal(str(wallet.balance))
-
-    if current_balance < amount:
-        log_failed_action(db=db, event="BILL_PAYMENT_FAILED", actor_type="USER", actor_id=user_id, error_message="Insufficient balance")
-        raise HTTPException(status_code=400, detail="Insufficient balance")
-
-    wallet.balance = str(current_balance - amount)
-
-    create_transaction(
-        db=db, user_id=user_id, wallet_id=wallet.id,
-        tx_type=TransactionType.BILLPAY, amount=amount,
-        currency_code=wallet.currency_code,
-        counterparty_kind="BILLER", counterparty_ref="biller_0000",
-        description="Bill payment", status=TransactionStatus.COMPLETED
-    )
-    db.commit()
-    db.refresh(wallet)
-    log_bill_payment(db=db, user_id=user_id, wallet_id=wallet.id, amount=str(amount))
-
-    return {"message": "Bill paid successfully", "new_balance": wallet.balance, "currency": wallet.currency_code}
+    return {
+        "id": payment.id, "user_id": payment.user_id, "status": payment.status,
+        "amount": payment.amount, "merchant": payment.merchant, "description": payment.description,
+        "created_at": payment.created_at.isoformat(), "updated_at": payment.updated_at.isoformat(),
+    }
