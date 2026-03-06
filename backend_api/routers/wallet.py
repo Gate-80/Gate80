@@ -99,6 +99,7 @@ def create_transaction(
 # -----------------------------
 # Endpoints
 # -----------------------------
+@router.get("/users/{user_id}/wallet", response_model=WalletBalanceResponse)
 def view_wallet_balance(user_id: str, db: Session = Depends(get_db)):
     ensure_user_exists(db, user_id)
     wallet = get_wallet_or_404(db, user_id)
@@ -109,7 +110,7 @@ def view_wallet_balance(user_id: str, db: Session = Depends(get_db)):
         "currency": wallet.currency_code,
     }
 
-
+@router.post("/users/{user_id}/wallet/topup")
 def topup_wallet(user_id: str, payload: WalletAmountRequest, db: Session = Depends(get_db)):
     ensure_user_exists(db, user_id)
     wallet = get_wallet_or_404(db, user_id)
@@ -154,6 +155,7 @@ def topup_wallet(user_id: str, payload: WalletAmountRequest, db: Session = Depen
     }
 
 
+@router.post("/users/{user_id}/wallet/withdraw")
 def withdraw_wallet(user_id: str, payload: WalletAmountRequest, db: Session = Depends(get_db)):
     ensure_user_exists(db, user_id)
     wallet = get_wallet_or_404(db, user_id)
@@ -209,6 +211,7 @@ def withdraw_wallet(user_id: str, payload: WalletAmountRequest, db: Session = De
     }
 
 
+@router.post("/users/{user_id}/wallet/transfer/{target_user_id}")
 def transfer_to_user(
     user_id: str, 
     target_user_id: str, 
@@ -283,7 +286,7 @@ def transfer_to_user(
         "currency": sender_wallet.currency_code,
     }
 
-
+@router.post("/users/{user_id}/wallet/pay-bill")
 def pay_bill(user_id: str, payload: WalletAmountRequest, db: Session = Depends(get_db)):
     ensure_user_exists(db, user_id)
     wallet = get_wallet_or_404(db, user_id)

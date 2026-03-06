@@ -24,7 +24,6 @@ logger = logging.getLogger("proxy")
 # -----------------------------
 BACKEND_URL = "http://127.0.0.1:8000"
 
-# Headers that should not be forwarded (HTTP hop-by-hop headers)
 HOP_BY_HOP_HEADERS = {
     "connection",
     "keep-alive",
@@ -78,7 +77,6 @@ def get_client_ip(request: Request) -> str:
 # -----------------------------
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Log all incoming requests with timing and request ID."""
     req_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     start = time.time()
 
@@ -119,8 +117,6 @@ async def reverse_proxy(request: Request, path: str):
         for k, v in request.headers.items()
         if k.lower() != "host" and k.lower() not in HOP_BY_HOP_HEADERS
     }
-    
-    # Add proxy identification header
     forward_headers["X-From-Proxy"] = "1"
     
     # Database session for logging
