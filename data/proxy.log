@@ -1,0 +1,576 @@
+2026-02-28 03:34:02 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:02 [proxy] id=f4513cb1-3221-46da-a945-2a032e5a423d GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:34:02 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:34:02 [proxy] id=9d4f2ff8-8e85-4f15-b682-b22d7e46590f GET /hello -> 200 2ms
+2026-02-28 03:34:04 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:04 [proxy] id=bc342eb8-ee2c-4685-afe9-9c2eeefbd933 GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:34:05 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:34:05 [proxy] id=1ac2c293-c734-4647-8531-943170a013c5 POST /api/v1/auth/sign-out -> 200 28ms
+2026-02-28 03:34:06 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/admin/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:34:06 [proxy] id=4e1472ad-164f-4120-aa3e-336e0f50605a POST /api/v1/admin/auth/sign-in -> 200 14ms
+2026-02-28 03:34:06 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:34:06 [proxy] id=69112d2b-e51d-4bf3-b0a1-2e99589bd385 GET /api/v1/admin/transactions -> 200 13ms
+2026-02-28 03:34:07 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:34:07 [proxy] id=e5935cf9-e5bd-4fef-b6b8-6afc44c5f63d GET /api/v1/admin/overview/financial -> 200 14ms
+2026-02-28 03:34:08 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:34:08 [proxy] id=a4fbbe59-e087-480b-893e-32859019ece3 GET /api/v1/admin/wallets -> 200 11ms
+2026-02-28 03:34:09 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:34:09 [proxy] id=161638c6-371d-4d9e-89a3-75eb2bf1fc7e GET /api/v1/admin/wallets -> 200 15ms
+2026-02-28 03:34:10 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:34:10 [proxy] id=15343c92-3b07-4860-a27b-1ffd29410f69 GET /api/v1/admin/users -> 200 13ms
+2026-02-28 03:34:12 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:34:12 [proxy] id=b8a37e85-8456-484e-a07d-529a2ddad19c GET /api/v1/admin/users -> 200 26ms
+2026-02-28 03:34:13 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:34:13 [proxy] id=b8d413bc-9e67-4711-adba-96a167d15182 GET /api/v1/admin/transactions -> 200 13ms
+2026-02-28 03:34:15 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:34:15 [proxy] id=cfd6227b-e909-4848-aa95-cfc2fb87b805 GET /api/v1/admin/overview/financial -> 200 12ms
+2026-02-28 03:34:17 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:34:17 [proxy] id=c85adbc2-b615-44ba-bb16-45e652927c02 GET /api/v1/admin/users -> 200 10ms
+2026-02-28 03:34:19 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:34:19 [proxy] id=3bdbdf8c-c4f5-4879-845f-381cd167bbff GET /api/v1/admin/users -> 200 21ms
+2026-02-28 03:34:21 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/admin/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:34:21 [proxy] id=787e2287-1f66-4608-a2ce-581a27e2fa72 POST /api/v1/admin/auth/sign-out -> 200 7ms
+2026-02-28 03:34:23 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:34:23 [proxy] id=8245dd90-612a-4e98-b789-d789f589ed7b POST /api/v1/auth/sign-in -> 200 18ms
+2026-02-28 03:34:23 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:23 [proxy] id=b8a1fcc4-2466-46bc-b6a1-d3d208b6ff00 GET /api/v1/auth/me -> 200 4ms
+2026-02-28 03:34:25 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:25 [proxy] id=5efd6cc5-72e8-47d9-b968-b413d50c4017 GET /api/v1/auth/me -> 200 5ms
+2026-02-28 03:34:27 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:27 [proxy] id=1408ccab-7de6-4435-8897-e264aaf1ee62 GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:34:27 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:34:27 [proxy] id=f4e6017c-0a86-4a09-9bf1-d58e6d55b36c POST /api/v1/auth/sign-out -> 200 27ms
+2026-02-28 03:34:28 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:34:28 [proxy] id=4f02d39e-071a-42a0-98a4-47ffd541391d POST /api/v1/auth/sign-in -> 200 9ms
+2026-02-28 03:34:28 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:28 [proxy] id=e3ea05a3-9e50-45c2-bf19-33c597e99e24 GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:34:29 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:34:29 [proxy] id=af899193-9a7b-4028-a6dd-983b03c7298f GET /hello -> 200 4ms
+2026-02-28 03:34:30 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:34:30 [proxy] id=7feca155-d35b-4fe8-be23-13805f719449 GET /health -> 200 1ms
+2026-02-28 03:34:31 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:34:31 [proxy] id=979cebdc-dbb7-473a-a816-f385e275964b POST /api/v1/auth/sign-out -> 200 26ms
+2026-02-28 03:34:33 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 401 Unauthorized"
+2026-02-28 03:34:33 [proxy] id=bc942c53-ca53-46e7-9e0f-d9807b825573 POST /api/v1/auth/sign-in -> 401 19ms
+2026-02-28 03:34:34 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:34:34 [proxy] id=cc7e737f-388a-4446-b738-1b50aecef3eb POST /api/v1/auth/sign-in -> 200 27ms
+2026-02-28 03:34:34 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:34 [proxy] id=82edae28-1f21-434c-9a9e-a856d3abc188 GET /api/v1/auth/me -> 200 5ms
+2026-02-28 03:34:34 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:34 [proxy] id=65e91791-3ee8-45a0-a5d4-fc89a355d5f5 GET /api/v1/auth/me -> 200 10ms
+2026-02-28 03:34:36 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:36 [proxy] id=e32b6aad-de04-4f00-8ea3-ce99cc18f15d GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:34:36 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:34:36 [proxy] id=95c9abf3-3d41-4d9c-9c75-3fe314fbb033 GET /hello -> 200 1ms
+2026-02-28 03:34:37 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:34:37 [proxy] id=1b1528fb-17ed-4935-95b2-314a84ff3e50 GET /health -> 200 2ms
+2026-02-28 03:34:39 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:39 [proxy] id=40aeb922-32fb-4718-a295-3d345882fcb1 GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:34:41 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:34:41 [proxy] id=581acd34-804f-4842-987d-8f1b95674542 GET /hello -> 200 2ms
+2026-02-28 03:34:41 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:41 [proxy] id=7524d4ba-9ab7-4de6-b492-67f9d80581b9 GET /api/v1/auth/me -> 200 6ms
+2026-02-28 03:34:43 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:34:43 [proxy] id=75372ea5-1f39-4ec0-873e-3863e3d1f2fd POST /api/v1/auth/sign-out -> 200 18ms
+2026-02-28 03:34:46 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:34:46 [proxy] id=85af1fe7-6323-43b6-831e-5c31b2634ed5 POST /api/v1/auth/sign-in -> 200 23ms
+2026-02-28 03:34:46 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:34:46 [proxy] id=b70381ba-3879-41aa-afce-dd253e7acf35 GET /hello -> 200 3ms
+2026-02-28 03:34:47 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:47 [proxy] id=40f5eb28-3675-4c7d-abb0-6308417305f3 GET /api/v1/auth/me -> 200 7ms
+2026-02-28 03:34:49 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:34:49 [proxy] id=4d772bff-e242-4172-bbaa-5105b570e698 GET /health -> 200 1ms
+2026-02-28 03:34:50 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:50 [proxy] id=69619ee2-bb53-454e-9188-5f7418246ddf GET /api/v1/auth/me -> 200 9ms
+2026-02-28 03:34:51 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:51 [proxy] id=c542403f-f00d-474e-8c2e-bb2aec131b1f GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:34:51 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:51 [proxy] id=64570338-63d3-4230-8be7-dd755634b986 GET /api/v1/auth/me -> 200 11ms
+2026-02-28 03:34:53 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:53 [proxy] id=e96564b3-c72a-4edf-a163-688c6ee4691c GET /api/v1/auth/me -> 200 4ms
+2026-02-28 03:34:55 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:34:55 [proxy] id=8cdf8765-8b70-407f-a060-47bad3f87790 GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:34:57 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:34:57 [proxy] id=6aed1a31-592a-4d97-bc6a-00acac6cb72e POST /api/v1/auth/sign-out -> 200 13ms
+2026-02-28 03:34:59 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/admin/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:34:59 [proxy] id=4611e4be-9758-4590-95c0-96c05df5893e POST /api/v1/admin/auth/sign-in -> 200 8ms
+2026-02-28 03:34:59 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:34:59 [proxy] id=32e05d1f-880a-478f-a8da-ba905eed41c8 GET /api/v1/admin/users -> 200 8ms
+2026-02-28 03:35:00 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:35:00 [proxy] id=fc227c37-0b44-41de-9676-3db2f55de3f1 GET /api/v1/admin/wallets -> 200 14ms
+2026-02-28 03:35:01 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:35:01 [proxy] id=7932327f-2aad-4dc2-96ec-9be4fefa9a45 GET /api/v1/admin/wallets -> 200 10ms
+2026-02-28 03:35:03 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:35:03 [proxy] id=08b0b64f-e450-4df1-9281-c2cdbe1658d1 GET /api/v1/admin/overview/financial -> 200 3ms
+2026-02-28 03:35:05 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:35:05 [proxy] id=cafb14a9-64b7-4d9e-a4c1-93fccb32b5fb GET /api/v1/admin/overview/financial -> 200 5ms
+2026-02-28 03:35:06 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:35:06 [proxy] id=02327a22-8989-4d42-9eea-8a8fa5f27ed7 GET /api/v1/admin/users -> 200 22ms
+2026-02-28 03:35:07 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:35:07 [proxy] id=a07b3871-10ab-4a12-adc4-e8d64b5a531e GET /api/v1/admin/wallets -> 200 15ms
+2026-02-28 03:35:08 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:35:08 [proxy] id=391fb72c-5b00-49ab-938d-945f0171becf GET /api/v1/admin/wallets -> 200 8ms
+2026-02-28 03:35:08 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:35:08 [proxy] id=b40b6c3d-11a9-4d21-a1ef-d91120a17b8f GET /api/v1/admin/users -> 200 14ms
+2026-02-28 03:35:11 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:35:11 [proxy] id=8cbe9ff6-6b7a-43b1-890c-37cb20c40e8b GET /api/v1/admin/wallets -> 200 20ms
+2026-02-28 03:35:12 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:35:12 [proxy] id=efc330ae-2809-4946-a01c-d4d33e6678bb GET /api/v1/admin/transactions -> 200 29ms
+2026-02-28 03:35:12 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:35:12 [proxy] id=8658ee61-2ee2-4cc4-9682-620c7648375f GET /api/v1/admin/users -> 200 13ms
+2026-02-28 03:35:13 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:35:13 [proxy] id=a59e2f5a-dd2e-4784-9c1b-f5b8b8c158a7 GET /api/v1/admin/wallets -> 200 7ms
+2026-02-28 03:35:14 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:35:14 [proxy] id=b9e35f03-9064-40cb-9932-edb90f09041b GET /api/v1/admin/users -> 200 8ms
+2026-02-28 03:35:15 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:35:15 [proxy] id=96442343-8e37-4543-867b-0a2b5d80464a GET /api/v1/admin/users -> 200 9ms
+2026-02-28 03:35:15 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:35:15 [proxy] id=bac7161b-b8f2-4597-bbdc-c952784f3a89 GET /api/v1/admin/overview/financial -> 200 5ms
+2026-02-28 03:35:16 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:35:16 [proxy] id=8f78959c-f6bc-4a91-b51d-5e09e1ce2e90 GET /api/v1/admin/wallets -> 200 10ms
+2026-02-28 03:35:19 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:35:19 [proxy] id=c2b216e8-3710-46d4-a05d-5bd7774d6a9d GET /api/v1/admin/transactions -> 200 18ms
+2026-02-28 03:35:19 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:35:19 [proxy] id=4f794975-f870-435e-8277-a02366ebb8eb GET /api/v1/admin/transactions -> 200 27ms
+2026-02-28 03:35:22 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:35:22 [proxy] id=e539a05f-37f6-4cbe-a746-a8c70aeee0d1 GET /api/v1/admin/users -> 200 7ms
+2026-02-28 03:35:24 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/admin/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:35:24 [proxy] id=34b0620d-acb9-47ed-9144-92831de6d50d POST /api/v1/admin/auth/sign-out -> 200 27ms
+2026-02-28 03:35:25 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:35:25 [proxy] id=4cb4f485-4919-4bb6-ad55-82cfcf5044c3 POST /api/v1/auth/sign-in -> 200 10ms
+2026-02-28 03:35:25 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:35:25 [proxy] id=9b2776c7-dce1-4419-bbb2-4d2dd663c1a3 GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:35:27 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:35:27 [proxy] id=f2671c42-8411-4d68-a6f2-abdd3fd265d9 GET /api/v1/auth/me -> 200 5ms
+2026-02-28 03:35:29 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:35:29 [proxy] id=d64404c4-c87b-409d-b20a-85d767d05c7d GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:35:30 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:35:30 [proxy] id=fca53544-aec3-4682-bb5d-14957ec7ac9b POST /api/v1/auth/sign-out -> 200 15ms
+2026-02-28 03:35:31 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:35:31 [proxy] id=175bbaca-7862-4184-a1e7-44191880fdf5 POST /api/v1/auth/sign-in -> 200 7ms
+2026-02-28 03:35:31 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:35:31 [proxy] id=0ec69ce2-2eeb-45a5-9ec1-229654ff2717 GET /health -> 200 1ms
+2026-02-28 03:35:33 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:35:33 [proxy] id=893d56de-b579-401d-8c89-8643cbddd967 GET /health -> 200 2ms
+2026-02-28 03:35:34 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:35:34 [proxy] id=4421ae7a-46cd-4a72-8d8f-298d4748368e GET /api/v1/auth/me -> 200 4ms
+2026-02-28 03:35:35 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:35:35 [proxy] id=20c55d16-0ecb-4946-b9f7-9a595e9ff6e8 POST /api/v1/auth/sign-out -> 200 7ms
+2026-02-28 03:35:37 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:35:37 [proxy] id=f55b3587-d2fd-497b-9e5b-be5eaff92722 POST /api/v1/auth/sign-in -> 200 24ms
+2026-02-28 03:35:37 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:35:37 [proxy] id=222be283-65ba-46d8-babb-3cf760ca06d6 GET /api/v1/auth/me -> 200 5ms
+2026-02-28 03:35:40 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:35:40 [proxy] id=f5a635fb-770d-4823-8267-f24438db5e36 GET /api/v1/auth/me -> 200 10ms
+2026-02-28 03:35:42 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:35:42 [proxy] id=0fffea9c-4651-4f7b-b63e-c37955b29d92 GET /hello -> 200 7ms
+2026-02-28 03:35:43 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:35:43 [proxy] id=46079b48-a60d-448d-9a4c-e3567523f442 POST /api/v1/auth/sign-out -> 200 28ms
+2026-02-28 03:35:46 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:35:46 [proxy] id=8c0ece15-3f0a-4a8a-9525-9bef399a5591 POST /api/v1/auth/sign-in -> 200 11ms
+2026-02-28 03:35:46 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:35:46 [proxy] id=2957e209-9463-4e72-89e5-1a763cab3211 GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:35:47 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:35:47 [proxy] id=123dc412-16b0-4147-a54f-a7d913b059b8 GET /health -> 200 1ms
+2026-02-28 03:35:49 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:35:49 [proxy] id=f1d0f811-c1e6-41d2-b89e-599b8ce0e309 GET /hello -> 200 5ms
+2026-02-28 03:35:51 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:35:51 [proxy] id=d9a03d0c-711b-4a4a-af23-11548c121e9d GET /health -> 200 2ms
+2026-02-28 03:35:53 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:35:53 [proxy] id=9440fe33-ae89-4954-96ad-515e7ca2d53b GET /health -> 200 1ms
+2026-02-28 03:35:53 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:35:53 [proxy] id=8a006cb2-0595-42dd-a66c-8f182576d49c GET /hello -> 200 1ms
+2026-02-28 03:35:54 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:35:54 [proxy] id=b745326a-9024-4f84-87a8-04a744c67ae9 GET /api/v1/auth/me -> 200 10ms
+2026-02-28 03:35:55 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:35:55 [proxy] id=6d7bf05f-15d2-4fd2-a8c1-62b11950cd7c GET /api/v1/auth/me -> 200 10ms
+2026-02-28 03:35:56 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:35:56 [proxy] id=03d534a2-77b8-48e7-84fe-fe1c97971a20 POST /api/v1/auth/sign-out -> 200 20ms
+2026-02-28 03:35:59 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/admin/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:35:59 [proxy] id=19f91b41-299d-4cbc-8bda-5bef1f95999f POST /api/v1/admin/auth/sign-in -> 200 7ms
+2026-02-28 03:35:59 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:35:59 [proxy] id=06effc17-810b-4bfc-92fe-461e1de6c9d6 GET /api/v1/admin/users -> 200 6ms
+2026-02-28 03:35:59 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:35:59 [proxy] id=2ce08717-2147-4fc0-abff-696ce52fa2e8 GET /api/v1/admin/transactions -> 200 8ms
+2026-02-28 03:36:00 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:00 [proxy] id=aeb13182-1619-4da8-8194-67af37656cf9 GET /api/v1/admin/users -> 200 12ms
+2026-02-28 03:36:02 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:36:02 [proxy] id=58bd5669-0d60-4090-a7ab-6374443bbe0f GET /api/v1/admin/wallets -> 200 9ms
+2026-02-28 03:36:04 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:36:04 [proxy] id=49972fe3-427b-4143-a6d5-ed52a3814bfa GET /api/v1/admin/overview/financial -> 200 3ms
+2026-02-28 03:36:05 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:05 [proxy] id=2df17f59-2800-4387-81b5-d9d1a31ac136 GET /api/v1/admin/users -> 200 26ms
+2026-02-28 03:36:07 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:36:07 [proxy] id=a862ff86-f5e2-494e-865a-cf75377e9a5f GET /api/v1/admin/overview/financial -> 200 2ms
+2026-02-28 03:36:08 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:36:08 [proxy] id=275da27b-3cd9-438b-badb-d694eb00b6db GET /api/v1/admin/wallets -> 200 27ms
+2026-02-28 03:36:10 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:10 [proxy] id=d07e8ebc-764e-4f64-8db4-a7bb80939afa GET /api/v1/admin/users -> 200 8ms
+2026-02-28 03:36:12 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:36:12 [proxy] id=f47e4812-6fa6-4c8a-94ae-d48b9ec7dbb5 GET /api/v1/admin/wallets -> 200 9ms
+2026-02-28 03:36:13 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:36:13 [proxy] id=92975728-2cc0-4168-a841-8348a533a7d2 GET /api/v1/admin/overview/financial -> 200 6ms
+2026-02-28 03:36:15 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:15 [proxy] id=e48c26fa-9793-4ed6-8033-52d382ecdf63 GET /api/v1/admin/users -> 200 7ms
+2026-02-28 03:36:16 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:16 [proxy] id=4e83016d-dacb-4984-89a1-e7eadd39468d GET /api/v1/admin/users -> 200 9ms
+2026-02-28 03:36:18 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:36:18 [proxy] id=c92eab98-5873-46ab-b826-0e0097375730 GET /api/v1/admin/transactions -> 200 42ms
+2026-02-28 03:36:20 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:36:20 [proxy] id=fd1ab5bf-10a8-4905-8af4-d945c8e88fdb GET /api/v1/admin/overview/financial -> 200 3ms
+2026-02-28 03:36:21 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:36:21 [proxy] id=f34c00e3-fc48-4ac3-8dfa-459f1b6315dd GET /api/v1/admin/transactions -> 200 9ms
+2026-02-28 03:36:21 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:36:21 [proxy] id=cbbe4c29-2278-4a56-928e-a7878d6cb998 GET /api/v1/admin/wallets -> 200 26ms
+2026-02-28 03:36:22 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:36:22 [proxy] id=edecf695-f8d1-437b-928c-9ee6f8307be5 GET /api/v1/admin/transactions -> 200 12ms
+2026-02-28 03:36:22 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:22 [proxy] id=939cce58-68e3-46aa-8473-28f4b5d9da8c GET /api/v1/admin/users -> 200 18ms
+2026-02-28 03:36:23 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:36:23 [proxy] id=e2c9477b-9eac-487e-a552-da33b19a8e8e GET /api/v1/admin/wallets -> 200 11ms
+2026-02-28 03:36:25 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:25 [proxy] id=72b51c37-d1ce-4da0-92f8-69565e4f36b2 GET /api/v1/admin/users -> 200 7ms
+2026-02-28 03:36:26 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:36:26 [proxy] id=4158dbb2-8bad-4298-bcc3-dc7877b3cbf1 GET /api/v1/admin/overview/financial -> 200 3ms
+2026-02-28 03:36:27 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:27 [proxy] id=050135db-2a97-40a5-bdee-9d0d1ee85a18 GET /api/v1/admin/users -> 200 7ms
+2026-02-28 03:36:28 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:36:28 [proxy] id=7b074e39-2ec5-4fbe-b1c9-ad7b899734aa GET /api/v1/admin/overview/financial -> 200 12ms
+2026-02-28 03:36:31 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:36:31 [proxy] id=25863007-3e9c-46c5-9238-390dc83606f1 GET /api/v1/admin/overview/financial -> 200 9ms
+2026-02-28 03:36:32 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:36:32 [proxy] id=defd25cd-25af-4187-871a-503c398b4535 GET /api/v1/admin/transactions -> 200 22ms
+2026-02-28 03:36:34 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:34 [proxy] id=95deadfa-547b-44ea-92c7-d84dbc16c397 GET /api/v1/admin/users -> 200 15ms
+2026-02-28 03:36:35 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:36:35 [proxy] id=30f55af0-5861-4033-83f0-bd4544753076 GET /api/v1/admin/transactions -> 200 10ms
+2026-02-28 03:36:37 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:37 [proxy] id=2fda0505-96a1-440c-9e5b-20fcd5388e23 GET /api/v1/admin/users -> 200 10ms
+2026-02-28 03:36:38 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:38 [proxy] id=1cfd19e8-2ab5-4f09-b060-75ce89488fc0 GET /api/v1/admin/users -> 200 20ms
+2026-02-28 03:36:40 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:36:40 [proxy] id=c848cd56-17d1-414e-a209-e3cdf57e0a96 GET /api/v1/admin/transactions -> 200 7ms
+2026-02-28 03:36:41 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:36:41 [proxy] id=364051d8-590e-45cd-81dd-45b7182bd129 GET /api/v1/admin/wallets -> 200 7ms
+2026-02-28 03:36:44 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:44 [proxy] id=18fa9b12-d5bb-4361-a6c0-7393be859241 GET /api/v1/admin/users -> 200 18ms
+2026-02-28 03:36:44 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:44 [proxy] id=cae21a46-eff3-4360-bdde-ceebfb3c3e45 GET /api/v1/admin/users -> 200 25ms
+2026-02-28 03:36:45 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:36:45 [proxy] id=fd9aa44b-2e09-4f9d-8286-bb2f37484aec GET /api/v1/admin/overview/financial -> 200 6ms
+2026-02-28 03:36:46 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:46 [proxy] id=ca3afeab-cefa-442f-a2a2-9c2dd040fa45 GET /api/v1/admin/users -> 200 8ms
+2026-02-28 03:36:48 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:36:48 [proxy] id=a7209529-cd3a-46ba-9c3b-2127dc3dbb89 GET /api/v1/admin/wallets -> 200 9ms
+2026-02-28 03:36:50 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:36:50 [proxy] id=d1219cb9-a7ba-43bc-98dc-d2b47a431a0b GET /api/v1/admin/transactions -> 200 10ms
+2026-02-28 03:36:53 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:36:53 [proxy] id=8e318a97-4af3-406a-bc75-9f82720472bd GET /api/v1/admin/wallets -> 200 10ms
+2026-02-28 03:36:54 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:36:54 [proxy] id=5a75dec6-4e5a-44ae-9114-b6d47b75bfdc GET /api/v1/admin/users -> 200 17ms
+2026-02-28 03:36:54 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/admin/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:36:54 [proxy] id=b9b15f14-ab4b-40ef-b9f5-a38d534883d2 POST /api/v1/admin/auth/sign-out -> 200 8ms
+2026-02-28 03:36:56 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:36:56 [proxy] id=35783628-248f-4acb-a886-cb5740b97379 POST /api/v1/auth/sign-in -> 200 9ms
+2026-02-28 03:36:56 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:36:56 [proxy] id=c2937263-a652-45bb-8da2-3ba9c9ca4a15 GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:36:58 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:36:58 [proxy] id=b2ff7fe2-0eef-4b1b-8536-d6ce74a60541 GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:37:00 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:00 [proxy] id=df5a0d92-00be-4840-887d-d85ca28ea9cd GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:37:01 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:37:01 [proxy] id=255e36b2-3437-41d0-ba8c-4d95dd9f46fe GET /hello -> 200 1ms
+2026-02-28 03:37:02 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:37:02 [proxy] id=73d12c30-936e-4cba-855a-3a4c05c38ac5 GET /health -> 200 4ms
+2026-02-28 03:37:05 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:37:05 [proxy] id=4ca329b2-fe6c-45a0-b8ac-d7ccfe05cd5b GET /health -> 200 2ms
+2026-02-28 03:37:07 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:37:07 [proxy] id=732a8734-d6e1-4d48-a323-852505920b3d GET /health -> 200 1ms
+2026-02-28 03:37:07 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:07 [proxy] id=fb3511aa-60f0-4e67-9be2-a7c9499e9d4f GET /api/v1/auth/me -> 200 9ms
+2026-02-28 03:37:09 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:37:09 [proxy] id=6937b3db-7acb-4644-969b-e7575ebb7055 POST /api/v1/auth/sign-out -> 200 16ms
+2026-02-28 03:37:11 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:37:11 [proxy] id=bc0401b9-067c-40af-a962-20754f855078 POST /api/v1/auth/sign-in -> 200 7ms
+2026-02-28 03:37:11 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:37:11 [proxy] id=be15fd7b-45d2-43d2-a9b7-68d9e06de383 GET /hello -> 200 1ms
+2026-02-28 03:37:12 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:37:12 [proxy] id=dc328734-9174-466f-910b-6aeca11f6deb GET /hello -> 200 2ms
+2026-02-28 03:37:12 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:12 [proxy] id=d67cefa3-63db-4c7c-94ba-edc5fb53ad49 GET /api/v1/auth/me -> 200 4ms
+2026-02-28 03:37:15 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:37:15 [proxy] id=394a891e-16fd-4f24-8c93-fce710c7b84a POST /api/v1/auth/sign-out -> 200 9ms
+2026-02-28 03:37:17 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:37:17 [proxy] id=c8b3c725-c883-4458-8c5c-9219f4fc41db POST /api/v1/auth/sign-in -> 200 15ms
+2026-02-28 03:37:17 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:17 [proxy] id=e5685a84-77e2-4026-bb26-a31b8f84a6f6 GET /api/v1/auth/me -> 200 4ms
+2026-02-28 03:37:18 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:18 [proxy] id=11e8ffbb-ab8d-4ab1-8b45-422c6b52a0f3 GET /api/v1/auth/me -> 200 9ms
+2026-02-28 03:37:20 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:20 [proxy] id=e1a65f40-dec0-4786-817d-45ca501b1040 GET /api/v1/auth/me -> 200 8ms
+2026-02-28 03:37:22 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:22 [proxy] id=f5994506-8142-4d90-ae21-cf4859741fd2 GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:37:22 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:37:22 [proxy] id=062a6e7b-6a64-4aa8-a439-841e3b931d8b GET /health -> 200 1ms
+2026-02-28 03:37:23 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:23 [proxy] id=52b3ea35-762d-411b-b9e6-9650fd96046f GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:37:25 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:25 [proxy] id=4f5a2b77-fc54-4f8c-849a-69b921f306cd GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:37:28 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:28 [proxy] id=f47543ca-c78b-4393-bbbf-721cec3817bb GET /api/v1/auth/me -> 200 5ms
+2026-02-28 03:37:29 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:37:29 [proxy] id=62b407d0-0a24-46d0-a5ca-898915639efc GET /hello -> 200 3ms
+2026-02-28 03:37:31 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:37:31 [proxy] id=ebe340ef-da6b-4e32-8bae-40f35805f5cd GET /health -> 200 2ms
+2026-02-28 03:37:31 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:37:31 [proxy] id=65d36ccb-d31b-472f-bde4-1ab084056326 GET /hello -> 200 3ms
+2026-02-28 03:37:32 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:32 [proxy] id=e1c60a56-5d87-4d23-a68f-d1ec79ee8f85 GET /api/v1/auth/me -> 200 12ms
+2026-02-28 03:37:33 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:37:33 [proxy] id=2ed8baba-9202-4c81-934d-aa4b1a507514 POST /api/v1/auth/sign-out -> 200 30ms
+2026-02-28 03:37:35 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/admin/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:37:35 [proxy] id=a60c82aa-33c0-4623-87c5-8c96556d2afe POST /api/v1/admin/auth/sign-in -> 200 9ms
+2026-02-28 03:37:35 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:37:35 [proxy] id=dcbb137c-4997-4854-9f4f-aecd882a47ab GET /api/v1/admin/users -> 200 7ms
+2026-02-28 03:37:36 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:37:36 [proxy] id=0c9502e0-8f20-4b40-8249-20acfd3ae392 GET /api/v1/admin/overview/financial -> 200 13ms
+2026-02-28 03:37:37 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:37:37 [proxy] id=5509cc09-1723-4514-a013-7d636ffd1f14 GET /api/v1/admin/transactions -> 200 10ms
+2026-02-28 03:37:39 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:37:39 [proxy] id=f2b0c954-3c98-4b60-ae8c-6bdad186a3c4 GET /api/v1/admin/users -> 200 23ms
+2026-02-28 03:37:40 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:37:40 [proxy] id=50a6d7c6-8a32-4f1e-8610-4b0e1964350b GET /api/v1/admin/wallets -> 200 10ms
+2026-02-28 03:37:43 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/admin/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:37:43 [proxy] id=d27661f0-b60e-49b0-b007-581ecb498814 POST /api/v1/admin/auth/sign-out -> 200 21ms
+2026-02-28 03:37:44 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:37:44 [proxy] id=eb75eb4e-19be-46de-a893-3eca6c98c19d POST /api/v1/auth/sign-in -> 200 8ms
+2026-02-28 03:37:44 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:37:44 [proxy] id=e51281ac-42f3-457f-9908-349d40baa285 GET /health -> 200 1ms
+2026-02-28 03:37:46 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:46 [proxy] id=2b68bf0d-6434-4b17-8476-b752eef9c965 GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:37:48 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:48 [proxy] id=b7eeaed9-8a1b-485d-9eb6-4f663b38ba2c GET /api/v1/auth/me -> 200 5ms
+2026-02-28 03:37:49 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:49 [proxy] id=9a119a2b-b247-4202-a1b5-ab594766bb82 GET /api/v1/auth/me -> 200 11ms
+2026-02-28 03:37:50 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:50 [proxy] id=06c91d2b-77b7-4dc2-bc82-b5951be7f71c GET /api/v1/auth/me -> 200 6ms
+2026-02-28 03:37:52 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:52 [proxy] id=6999ab9a-afc5-44e3-b0ce-ec156d500fcf GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:37:53 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:53 [proxy] id=5cb4c6e6-ba27-4b58-a17e-7d70080c60a8 GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:37:55 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:55 [proxy] id=e3f23745-4c65-4242-9792-1862c894bb86 GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:37:56 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:37:56 [proxy] id=deb34c61-9645-4e57-b4bd-215c443fda16 POST /api/v1/auth/sign-out -> 200 7ms
+2026-02-28 03:37:58 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:37:58 [proxy] id=099e4ee6-8089-49cc-94a5-c9e0856d7c65 POST /api/v1/auth/sign-in -> 200 7ms
+2026-02-28 03:37:58 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:58 [proxy] id=d74715ea-8ff2-46e1-a8a6-8aef12b9d03b GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:37:58 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:58 [proxy] id=4c4c2493-1f5d-446b-afc5-f9ce23b4369b GET /api/v1/auth/me -> 200 5ms
+2026-02-28 03:37:59 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:37:59 [proxy] id=73536e95-9df3-4eca-b963-6892d3cc7239 GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:38:00 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:38:00 [proxy] id=4fd7289d-aaae-48bb-8357-e5c95775e757 POST /api/v1/auth/sign-out -> 200 10ms
+2026-02-28 03:38:02 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/admin/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:38:02 [proxy] id=93ccfa4b-4e0a-406c-96db-59667bab17f4 POST /api/v1/admin/auth/sign-in -> 200 13ms
+2026-02-28 03:38:02 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:38:02 [proxy] id=4feb69c0-341f-4527-8b1b-a0720a1316e9 GET /api/v1/admin/overview/financial -> 200 6ms
+2026-02-28 03:38:03 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:38:03 [proxy] id=c04e0892-f560-4701-83d2-32160b597608 GET /api/v1/admin/overview/financial -> 200 5ms
+2026-02-28 03:38:05 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:38:05 [proxy] id=a96c70b9-ec3f-4bf5-b993-09e1c0c7233b GET /api/v1/admin/users -> 200 24ms
+2026-02-28 03:38:06 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:38:06 [proxy] id=6fc04b06-6cbc-4276-b5bc-d844aa51729d GET /api/v1/admin/wallets -> 200 51ms
+2026-02-28 03:38:07 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:38:07 [proxy] id=ab1e57d7-e18b-4109-8109-05bcf1738888 GET /api/v1/admin/wallets -> 200 8ms
+2026-02-28 03:38:07 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:38:07 [proxy] id=3e84ea67-cd48-4c19-99cc-f3d95878da56 GET /api/v1/admin/users -> 200 7ms
+2026-02-28 03:38:10 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:38:10 [proxy] id=aeacd107-fcdf-4aca-9623-ae254aefae3d GET /api/v1/admin/users -> 200 8ms
+2026-02-28 03:38:12 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:38:12 [proxy] id=0897b9e4-f6ef-4895-b02d-5c8ad8a02486 GET /api/v1/admin/transactions -> 200 7ms
+2026-02-28 03:38:13 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:38:13 [proxy] id=cfcb47ba-6b24-4fa7-9968-5830f5eb18b4 GET /api/v1/admin/users -> 200 10ms
+2026-02-28 03:38:14 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:38:14 [proxy] id=7deb5667-4798-45c7-9af4-5b386a78f032 GET /api/v1/admin/wallets -> 200 15ms
+2026-02-28 03:38:15 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/admin/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:38:15 [proxy] id=7cca525f-9593-4024-a4c6-7036cc3ba37f POST /api/v1/admin/auth/sign-out -> 200 15ms
+2026-02-28 03:38:17 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:38:17 [proxy] id=6d34d584-ae05-4baa-a6bb-c4068ee54057 POST /api/v1/auth/sign-in -> 200 9ms
+2026-02-28 03:38:17 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:38:17 [proxy] id=19151009-7d89-4590-b948-92565836e80e GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:38:18 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:38:18 [proxy] id=1678b3f7-c9d0-4b8b-a746-94535bb2df37 GET /api/v1/auth/me -> 200 12ms
+2026-02-28 03:38:20 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:38:20 [proxy] id=ec474fb1-8017-4909-9afe-b8be7db0ddbc GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:38:20 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:38:20 [proxy] id=5cf6da0f-204a-43f3-bdee-9f7ea8322f16 GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:38:21 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:38:21 [proxy] id=4a88b156-affa-4158-9567-23597adc00f1 GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:38:23 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:38:23 [proxy] id=2173b352-8dd1-4364-9397-1b9c98fece05 GET /hello -> 200 6ms
+2026-02-28 03:38:24 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:38:24 [proxy] id=5d61dcfe-9758-459d-889e-819017490a9c GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:38:25 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:38:25 [proxy] id=ff697fe3-2d66-4d12-b98a-6f91aa398dff GET /api/v1/auth/me -> 200 9ms
+2026-02-28 03:38:26 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:38:26 [proxy] id=cf2c9873-79ef-4fbc-9c9c-7ef4fd63ed31 GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:38:27 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:38:27 [proxy] id=8eac0567-29f6-4bac-84d9-58ca52fa37cf GET /health -> 200 2ms
+2026-02-28 03:38:29 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:38:29 [proxy] id=a8ca2adf-724a-4a18-ac57-0bbd3d4c6c03 GET /hello -> 200 1ms
+2026-02-28 03:38:30 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:38:30 [proxy] id=b77ea060-26db-4d42-8e0d-d41508267d41 GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:38:31 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:38:31 [proxy] id=b1a9d75c-7efb-4c41-8e13-54b102c532af POST /api/v1/auth/sign-out -> 200 8ms
+2026-02-28 03:38:32 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/admin/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:38:32 [proxy] id=9693a011-9361-45b7-af31-9d4fcdeb4721 POST /api/v1/admin/auth/sign-in -> 200 9ms
+2026-02-28 03:38:32 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:38:32 [proxy] id=ae685d0d-e226-4c37-b0d5-81b417ea6102 GET /api/v1/admin/transactions -> 200 8ms
+2026-02-28 03:38:33 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:38:33 [proxy] id=46267b80-05c0-45ae-8155-4d1190c2fce9 GET /api/v1/admin/wallets -> 200 24ms
+2026-02-28 03:38:34 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:38:34 [proxy] id=e08ab392-fa76-4186-817e-02f8b97c494b GET /api/v1/admin/transactions -> 200 31ms
+2026-02-28 03:38:36 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:38:36 [proxy] id=aa20d7b5-caa6-41f6-8b86-a603120d300f GET /api/v1/admin/transactions -> 200 26ms
+2026-02-28 03:38:37 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:38:37 [proxy] id=e2ff69ba-b004-478c-81ef-962e5ffe4a42 GET /api/v1/admin/overview/financial -> 200 7ms
+2026-02-28 03:38:39 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:38:39 [proxy] id=fff79fa7-219a-41af-bffc-9f9b45b6f307 GET /api/v1/admin/overview/financial -> 200 3ms
+2026-02-28 03:38:41 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:38:41 [proxy] id=80841da5-5177-46af-af94-e26598b8ed82 GET /api/v1/admin/wallets -> 200 25ms
+2026-02-28 03:38:43 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:38:43 [proxy] id=4fe5f92f-dcf0-4759-998b-a435425ee9ba GET /api/v1/admin/users -> 200 21ms
+2026-02-28 03:38:44 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:38:44 [proxy] id=af28bb0e-00ab-4f14-bd57-e97e9ec72043 GET /api/v1/admin/users -> 200 12ms
+2026-02-28 03:38:45 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:38:45 [proxy] id=6f1035d3-86ab-4467-a855-ff09ccbbb20b GET /api/v1/admin/wallets -> 200 14ms
+2026-02-28 03:38:46 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/admin/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:38:46 [proxy] id=be304208-d43e-45cf-8d11-ade5a5cea851 POST /api/v1/admin/auth/sign-out -> 200 11ms
+2026-02-28 03:38:47 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:38:47 [proxy] id=6e569919-9620-4282-b459-82becbd08fc7 POST /api/v1/auth/sign-in -> 200 14ms
+2026-02-28 03:38:47 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:38:47 [proxy] id=1ed458de-9678-421c-92ae-a4c6324820b0 GET /hello -> 200 2ms
+2026-02-28 03:38:48 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:38:48 [proxy] id=bacef076-d055-4e71-a128-86b8b7955a81 GET /api/v1/auth/me -> 200 9ms
+2026-02-28 03:38:49 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:38:49 [proxy] id=5e06b04a-5561-49d0-add1-581a32a2ce8b GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:38:51 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:38:51 [proxy] id=7081e6d8-7172-4246-964e-d9bae1574a46 POST /api/v1/auth/sign-out -> 200 21ms
+2026-02-28 03:38:53 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:38:53 [proxy] id=6790d232-1371-4e0e-9ccb-bdc9d80d4ddb POST /api/v1/auth/sign-in -> 200 10ms
+2026-02-28 03:38:53 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:38:53 [proxy] id=3e987bf3-9e2b-406d-9472-c16603604918 GET /health -> 200 1ms
+2026-02-28 03:38:54 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:38:54 [proxy] id=b0552940-7fa6-4df2-8cc7-24aa32292013 GET /health -> 200 5ms
+2026-02-28 03:38:56 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:38:56 [proxy] id=61ab7b7a-c0ad-4e4c-9468-433deac2f5b3 GET /health -> 200 6ms
+2026-02-28 03:38:56 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:38:56 [proxy] id=ab5110e3-addf-4c81-ad2e-b92c9e02cc06 POST /api/v1/auth/sign-out -> 200 17ms
+2026-02-28 03:38:59 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:38:59 [proxy] id=502a3da6-ed98-476f-af43-3a3baea48829 POST /api/v1/auth/sign-in -> 200 13ms
+2026-02-28 03:38:59 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:38:59 [proxy] id=f7953da9-a4cc-4955-a09c-36f0b74b0b02 GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:39:01 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:01 [proxy] id=2e86773e-6305-4439-b9ce-cf8dce4b9749 GET /api/v1/auth/me -> 200 9ms
+2026-02-28 03:39:02 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:02 [proxy] id=dc8dc19a-a7ee-4490-be23-b5e2c2061535 GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:39:03 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:39:03 [proxy] id=28eadda6-21ce-4616-9772-9be0a7245774 POST /api/v1/auth/sign-out -> 200 24ms
+2026-02-28 03:39:05 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:39:05 [proxy] id=ed3bf795-4836-405c-8976-53d0fb2d0bef POST /api/v1/auth/sign-in -> 200 9ms
+2026-02-28 03:39:05 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:05 [proxy] id=cd200255-2e27-43bf-b559-037a76b571cc GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:39:06 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:06 [proxy] id=d5a867e7-6075-4227-99ce-4f42897ffb6f GET /api/v1/auth/me -> 200 7ms
+2026-02-28 03:39:07 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:07 [proxy] id=d63f3fb9-21d4-4637-a3c2-08d86bf48dfd GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:39:08 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:08 [proxy] id=3976ed6d-b5fc-44d2-8859-9c516270d902 GET /api/v1/auth/me -> 200 10ms
+2026-02-28 03:39:10 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:10 [proxy] id=b613fb5d-3a21-43f4-9a48-166b04edc764 GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:39:11 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:11 [proxy] id=723d2c14-de60-4193-8bf1-0c4e96ec0b2d GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:39:12 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:12 [proxy] id=7b44bbf7-878e-4cf5-88d0-3574bbd4d58a GET /api/v1/auth/me -> 200 6ms
+2026-02-28 03:39:13 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:13 [proxy] id=13e565dc-bc40-4e62-845c-946e136a2f19 GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:39:14 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:14 [proxy] id=03a95710-4565-4b15-81d8-3d32d71274c9 GET /api/v1/auth/me -> 200 2ms
+2026-02-28 03:39:14 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:14 [proxy] id=5c366150-6a16-42e6-8fc2-8035c8841c75 GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:39:16 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:39:16 [proxy] id=ed311ffa-ea17-40bb-8ac8-83f3534034fb GET /hello -> 200 1ms
+2026-02-28 03:39:17 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:17 [proxy] id=cb3276c2-f8a0-4c1a-870d-468c107736fd GET /api/v1/auth/me -> 200 13ms
+2026-02-28 03:39:19 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:39:19 [proxy] id=ac785a07-8e97-423a-82a4-8df7ea6c2d61 POST /api/v1/auth/sign-out -> 200 42ms
+2026-02-28 03:39:20 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/admin/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:39:20 [proxy] id=59e9c71b-17dd-468e-93c9-34b1fd131e15 POST /api/v1/admin/auth/sign-in -> 200 8ms
+2026-02-28 03:39:20 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:39:20 [proxy] id=02fde633-affd-4842-adf7-4f632b13d8cf GET /api/v1/admin/users -> 200 7ms
+2026-02-28 03:39:22 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:39:22 [proxy] id=af4cc71d-c1f9-4639-9a2c-c809b2a2678f GET /api/v1/admin/users -> 200 8ms
+2026-02-28 03:39:25 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:39:25 [proxy] id=cc150270-0527-47e6-80d4-c7e03d4c1fdd GET /api/v1/admin/wallets -> 200 7ms
+2026-02-28 03:39:26 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:39:26 [proxy] id=877196ce-7b4e-44d5-a22c-c8433cbe0995 GET /api/v1/admin/wallets -> 200 27ms
+2026-02-28 03:39:27 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:39:27 [proxy] id=155ab8b5-0bdc-4aaa-9fb2-5c9b7b15c2cc GET /api/v1/admin/transactions -> 200 15ms
+2026-02-28 03:39:28 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:39:28 [proxy] id=249dc32f-8f54-4298-bd73-062c02f183ad GET /api/v1/admin/transactions -> 200 17ms
+2026-02-28 03:39:29 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:39:29 [proxy] id=6f837d31-4799-4e3f-a303-3d4de4a1361d GET /api/v1/admin/overview/financial -> 200 12ms
+2026-02-28 03:39:30 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:39:30 [proxy] id=b104b362-400b-4539-8bcc-4e446cfef91f GET /api/v1/admin/overview/financial -> 200 3ms
+2026-02-28 03:39:30 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:39:30 [proxy] id=ec247581-550f-4167-92c6-0f4a5fcb33ce GET /api/v1/admin/users -> 200 8ms
+2026-02-28 03:39:32 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:39:32 [proxy] id=a1de3af4-c808-40b6-9bae-d3cfe6182e3d GET /api/v1/admin/users -> 200 14ms
+2026-02-28 03:39:34 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:39:34 [proxy] id=d3749f09-9053-4529-aa14-16f8d9759d55 GET /api/v1/admin/overview/financial -> 200 11ms
+2026-02-28 03:39:34 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/wallets "HTTP/1.1 200 OK"
+2026-02-28 03:39:34 [proxy] id=e865df45-6019-41b6-aef4-6266849dff32 GET /api/v1/admin/wallets -> 200 25ms
+2026-02-28 03:39:36 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:39:36 [proxy] id=6465313f-6527-405d-a7bb-29bb0117f36c GET /api/v1/admin/overview/financial -> 200 3ms
+2026-02-28 03:39:37 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:39:37 [proxy] id=440540b0-895c-479b-914c-92957a3d5a32 GET /api/v1/admin/users -> 200 10ms
+2026-02-28 03:39:39 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:39:39 [proxy] id=6aef7017-e0ad-4f7b-9655-e4e0463777e2 GET /api/v1/admin/users -> 200 27ms
+2026-02-28 03:39:40 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:39:40 [proxy] id=099ef1ea-f793-42cc-a9d4-340054fe3ee5 GET /api/v1/admin/users -> 200 8ms
+2026-02-28 03:39:42 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/overview/financial "HTTP/1.1 200 OK"
+2026-02-28 03:39:42 [proxy] id=9c1ed7e3-ac7a-45bf-aef4-3c3fdda932bb GET /api/v1/admin/overview/financial -> 200 4ms
+2026-02-28 03:39:43 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:39:43 [proxy] id=b461d3a1-ebdd-4d2c-afe1-a4b1b4ca62a2 GET /api/v1/admin/users -> 200 27ms
+2026-02-28 03:39:44 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/users "HTTP/1.1 200 OK"
+2026-02-28 03:39:44 [proxy] id=8ab50ad0-5dd3-40d2-a1d6-95f7fa3caeeb GET /api/v1/admin/users -> 200 8ms
+2026-02-28 03:39:44 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/admin/transactions "HTTP/1.1 200 OK"
+2026-02-28 03:39:44 [proxy] id=02c858c4-d509-4008-931f-340ce8885ebe GET /api/v1/admin/transactions -> 200 10ms
+2026-02-28 03:39:45 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/admin/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:39:45 [proxy] id=6a00cda9-2a24-45ca-8f5e-7b8795822f91 POST /api/v1/admin/auth/sign-out -> 200 26ms
+2026-02-28 03:39:46 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:39:46 [proxy] id=4f6e08e5-52af-454d-914a-6c71d3c4a573 POST /api/v1/auth/sign-in -> 200 8ms
+2026-02-28 03:39:46 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:39:46 [proxy] id=5cc5450d-6c0e-4b21-88b5-f3d8c8350d20 GET /health -> 200 1ms
+2026-02-28 03:39:48 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:48 [proxy] id=db45f209-1fed-443e-b742-11f38d3998cf GET /api/v1/auth/me -> 200 10ms
+2026-02-28 03:39:48 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:48 [proxy] id=06bf989c-8749-424a-9f3b-5203958b01d3 GET /api/v1/auth/me -> 200 8ms
+2026-02-28 03:39:49 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:49 [proxy] id=3f6610df-09a4-4966-8c27-f44992d2ee8e GET /api/v1/auth/me -> 200 8ms
+2026-02-28 03:39:50 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:50 [proxy] id=402c2219-3656-4442-879a-a8ed7503fe7a GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:39:52 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:39:52 [proxy] id=e71aef34-26bc-4ad9-b664-f45434c661e5 GET /health -> 200 2ms
+2026-02-28 03:39:53 [proxy] HTTP Request: GET http://127.0.0.1:8000/hello "HTTP/1.1 200 OK"
+2026-02-28 03:39:53 [proxy] id=ca1ec940-2b10-4d07-96c8-ae639aaeca3e GET /hello -> 200 3ms
+2026-02-28 03:39:54 [proxy] HTTP Request: GET http://127.0.0.1:8000/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-02-28 03:39:54 [proxy] id=1d7a81e5-ebd7-4d5b-bc7f-07a9099faf06 GET /api/v1/auth/me -> 200 3ms
+2026-02-28 03:39:55 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-out "HTTP/1.1 200 OK"
+2026-02-28 03:39:55 [proxy] id=fdbd7551-6390-493a-a9e6-548f8ee56101 POST /api/v1/auth/sign-out -> 200 17ms
+2026-02-28 03:39:56 [proxy] HTTP Request: POST http://127.0.0.1:8000/api/v1/auth/sign-in "HTTP/1.1 200 OK"
+2026-02-28 03:39:56 [proxy] id=74a6953a-5365-4886-a403-3a80b6ddc24a POST /api/v1/auth/sign-in -> 200 9ms
+2026-02-28 03:39:56 [proxy] HTTP Request: GET http://127.0.0.1:8000/health "HTTP/1.1 200 OK"
+2026-02-28 03:39:56 [proxy] id=c1abd293-5010-457e-9b72-0215f25f8abd GET /health -> 200 1ms

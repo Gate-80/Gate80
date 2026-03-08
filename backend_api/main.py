@@ -9,8 +9,12 @@ from backend_api.routers import (
     user_authentication
 )
 from backend_api.db.database import init_db
+from app.middleware import RequestLoggingMiddleware
+
 
 app = FastAPI(title="RASD Digital Wallet API", version="1.0.0")
+
+app.add_middleware(RequestLoggingMiddleware)
 
 
 # Initialize database on startup
