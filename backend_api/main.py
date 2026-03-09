@@ -9,8 +9,7 @@ from backend_api.routers import (
     user_authentication
 )
 from backend_api.db.database import init_db
-from app.middleware import RequestLoggingMiddleware
-
+from backend_api.middleware.logging import RequestLoggingMiddleware
 
 app = FastAPI(title="RASD Digital Wallet API", version="1.0.0")
 

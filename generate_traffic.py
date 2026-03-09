@@ -58,6 +58,8 @@ SOURCE_TOOL        = "playwright"
 
 MISTAKE_SESSION_RATE = 0.08
 
+SESSION_TYPES = ["normal", "suspicious", "fraud"]
+
 MISTAKE_WEIGHTS = {
     "wrong_password":        30,
     "overdraft":             20,
@@ -433,6 +435,9 @@ async def register_new_user(ctx) -> Optional[dict]:
     city        = random.choice(SAUDI_CITIES)
     ct          = pick_client_type()
     ua          = pick_user_agent()
+  
+    
+
     payload = {
         "full_name": fake.name(),
         "email":     email,
@@ -781,6 +786,7 @@ async def inject_mistake(ctx, sid: str, uid: Optional[str],
 # ─────────────────────────────────────────────
 # USER SESSION RUNNER
 # ─────────────────────────────────────────────
+
 async def run_session(ctx) -> None:
     sid          = str(uuid.uuid4())
     persona_name = pick_persona()
@@ -792,6 +798,7 @@ async def run_session(ctx) -> None:
     ct           = user.get("client_type", pick_client_type())
     ua           = user.get("user_agent",  pick_user_agent())
 
+   
     # Stagger start — creates genuine server load contention for RT variance
     await asyncio.sleep(random.uniform(0, 8))
 
@@ -851,7 +858,7 @@ async def run_session(ctx) -> None:
                            response_length=r_len, geo_location=geo,
                            client_type=ct, user_agent=ua))
 
-
+    
 # ─────────────────────────────────────────────
 # ADMIN SESSION RUNNER
 # Variable session length from Faker code (5–35 actions).
@@ -918,6 +925,104 @@ async def run_admin_session(ctx) -> None:
                            response_length=r_len, geo_location=geo,
                            client_type=ct, user_agent=ua))
 
+
+async def suspicious_session(ctx, user):
+    """
+    Simulates suspicious behaviour
+    """
+
+    session_id = str(uuid.uuid4())
+    user_id = user["id"]
+
+    print(f"[SUSPICIOUS SESSION] {user_id}")
+
+    # multiple failed logins
+    for _ in range(random.randint(5,10)):
+
+        await safe_post(
+            ctx,
+            "/api/v1/auth/sign-in",
+            {},
+            {
+                "email": user["email"],
+                "password": "wrong_password"
+            }
+        )
+
+        await asyncio.sleep(random.uniform(0.1,0.5))
+
+    # probing admin endpoints
+    admin_targets = [
+        "/api/v1/admin/users",
+        "/api/v1/admin/wallets",
+        "/api/v1/admin/transactions"
+    ]
+
+    for endpoint in admin_targets:
+
+        await safe_get(ctx, endpoint, {})
+
+        await asyncio.sleep(random.uniform(0.2,1))
+
+
+async def fraud_session(ctx, user):
+    """
+    Simulates fraud-like behaviour
+    """
+
+    session_id = str(uuid.uuid4())
+    user_id = user["id"]
+
+    print(f"[FRAUD SESSION] {user_id}")
+
+    token = await login(ctx, user, {})
+
+    if not token:
+        return
+
+    headers = {
+        USER_TOKEN_HEADER: token
+    }
+
+    # rapid wallet operations
+    for _ in range(random.randint(10,20)):
+
+        action = random.choice([
+            "transfer",
+            "withdraw",
+            "paybill"
+        ])
+
+        if action == "transfer":
+
+            await safe_post(
+                ctx,
+                f"/api/v1/users/{user_id}/wallet/transfer/u_1002",
+                headers,
+                {"amount": random.randint(1,50)}
+            )
+
+        elif action == "withdraw":
+
+            await safe_post(
+                ctx,
+                f"/api/v1/users/{user_id}/wallet/withdraw",
+                headers,
+                {"amount": random.randint(1,50)}
+            )
+
+        else:
+
+            await safe_post(
+                ctx,
+                f"/api/v1/users/{user_id}/wallet/pay-bill",
+                headers,
+                {"amount": random.randint(1,30)}
+            )
+
+        await asyncio.sleep(random.uniform(0.05,0.3))
+
+    
 
 # ─────────────────────────────────────────────
 # MAIN
