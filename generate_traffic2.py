@@ -1,28 +1,6 @@
 """
 RASD - Unified Realistic Behavioral Traffic Generator
-Week 4 - Task 1: Baseline Normal Traffic
-
-Combines the best of Playwright (async, concurrency, 80 users, 9 mistake types)
-and Faker (persona endpoint weights, client_type, user_agent, uuid4 session IDs,
-UTC timestamps, health/hello endpoints, variable admin sessions).
-
-Architecture:
-  - Playwright async engine — persistent browser per worker slot
-  - 80 users registered at startup (all get wallet + bank account via backend fix)
-  - 9 mistake types at 8% session rate
-  - 4 personas with per-endpoint probability weights
-  - All 20 endpoints covered
-  - 20 CSV columns (17 base + client_type + user_agent + source_tool)
-
-notes applied:
-  - session_id = uuid4 (consistent, groupable for feature engineering)
-  - timestamp  = UTC ISO format (consistent across all tools)
-  - source_tool column for merge traceability
-  - Clear session summaries printed to console
-
-Install:
-    pip install playwright faker
-    playwright install chromium
+Week 4 - Abnormal Traffic
 
 Run:
     python generate_traffic.py
