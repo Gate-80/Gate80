@@ -5,11 +5,11 @@ RASD - Step 3: Extract Behavioral Features
 Week 4/5 - Feature Engineering
 
 Takes:
-  - traffic_log.csv      (request-level raw logs)
-  - TrafficLog_sessions.csv  (session objects from Step 2)
+  - dataset/output/traffic_log.csv      (request-level raw logs)
+  - dataset/output/TrafficLog_sessions.csv  (session objects from Step 2)
 
 Produces:
-  - baseline_sessions.csv  (session-level feature dataset for ML)
+  - dataset/output/baseline_sessions.csv  (session-level feature dataset for ML)
 
 Features computed per session:
   --- Session metrics ---
@@ -63,9 +63,9 @@ from datetime import datetime, timezone
 # ─────────────────────────────────────────────
 # CONFIG
 # ─────────────────────────────────────────────
-TRAFFIC_LOG_FILE  = "output/traffic_log.csv"
-SESSIONS_FILE     = "output/TrafficLog_sessions.csv"
-OUTPUT_FILE       = "output/baseline_sessions.csv"
+TRAFFIC_LOG_FILE  = "dataset/output/traffic_log.csv"
+SESSIONS_FILE     = "dataset/output/sessions_features.csv"
+OUTPUT_FILE       = "dataset/output/baseline_sessions.csv"
 
 WALLET_ACTIONS = {
     "wallet_view", "topup", "withdraw", "transfer", "pay_bill",

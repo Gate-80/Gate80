@@ -1,5 +1,5 @@
 """
-RASD - Unified Realistic Behavioral Traffic Generator
+GATE80 - Unified Realistic Behavioral Traffic Generator
 Week 4 - Task 1: Baseline Normal Traffic
 
 Combines the best of Playwright (async, concurrency, 80 users, 9 mistake types)
@@ -25,7 +25,7 @@ Install:
     playwright install chromium
 
 Run:
-    python generate_traffic.py
+    python dataset/generate_normal_traffic.py
 """
 
 from __future__ import annotations

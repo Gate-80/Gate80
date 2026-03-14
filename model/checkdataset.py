@@ -1,8 +1,8 @@
 import pandas as pd
 
 # load both datasets
-baseline = pd.read_csv("model/baseline_sessions.csv")
-abnormal = pd.read_csv("model/abnormal_sessions.csv")
+baseline = pd.read_csv("dataset/output/baseline_sessions.csv")
+abnormal = pd.read_csv("dataset/abnormal/output/abnormal_sessions.csv")
 
 # check shapes
 print("Baseline shape:", baseline.shape)
