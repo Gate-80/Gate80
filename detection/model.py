@@ -5,7 +5,7 @@ import pickle
 import logging
 import threading
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Dict, Tuple
 
 import numpy as np
 
@@ -59,7 +59,7 @@ class AnomalyDetector:
 
     def __init__(self, model_path: str, scaler_path: str):
         self._lock = threading.Lock()
-        self._sessions: dict[str, SessionState] = {}
+        self._sessions: Dict[str, SessionState] = {}
 
         logger.info("GATE80 ▶ loading model  : %s", model_path)
         with open(model_path, "rb") as f:
@@ -140,7 +140,7 @@ class AnomalyDetector:
 
     # ── Scoring ───────────────────────────────────────────────────────────────
 
-    def score_session(self, session_id: str) -> tuple[bool, float]:
+    def score_session(self, session_id: str) -> Tuple[bool, float]:
         with self._lock:
             s = self._sessions.get(session_id)
             if s is None:
@@ -181,7 +181,7 @@ class AnomalyDetector:
         path: str,
         response_status: int,
         response_time_ms: int,
-    ) -> tuple[bool, float]:
+    ) -> Tuple[bool, float]:
         self.update_session(session_id, path, response_status, response_time_ms)
         return self.score_session(session_id)
 
