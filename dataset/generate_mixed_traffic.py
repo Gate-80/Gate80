@@ -1,9 +1,9 @@
 """
-RASD - Unified Realistic Behavioral Traffic Generator
+GATE80 - Unified Realistic Behavioral Traffic Generator
 Week 4 - Abnormal Traffic
 
 Run:
-    python generate_traffic.py
+    python dataset/generate_mixed_traffic.py
 """
 
 from __future__ import annotations

@@ -5,11 +5,11 @@ RASD - Step 3: Extract Behavioral Features for Abnormal Sessions
 Week 4/5 - Feature Engineering
 
 Takes:
-  - traffic_log.csv
-  - TrafficLog_abnormal_sessions.csv
+  - dataset/output/mixed_traffic_log.csv
+  - dataset/abnormal/output/TrafficLog_abnormal_sessions.csv
 
 Produces:
-  - abnormal_sessions.csv
+  - dataset/abnormal/output/abnormal_sessions.csv
 
 Features computed per session:
   --- Session metrics ---

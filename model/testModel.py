@@ -10,7 +10,7 @@ scaler = joblib.load("model/scaler.pkl")
 # -----------------------------
 # 2. Load abnormal test dataset
 # -----------------------------
-df = pd.read_csv("model/abnormal_sessionsSw.csv")
+df = pd.read_csv("dataset/abnormal/output/abnormal_sessionsSw.csv")
 
 # -----------------------------
 # 3. Select same features used in training

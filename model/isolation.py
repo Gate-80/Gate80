@@ -6,7 +6,7 @@ import joblib
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import IsolationForest
 
-df = pd.read_csv("model/baseline_sessions.csv")
+df = pd.read_csv("dataset/output/baseline_sessions.csv")
 #print(df.dtypes)
 # numeric statistics
 #stats = df.describe()
