@@ -1,6 +1,28 @@
 """
 RASD - Unified Realistic Behavioral Traffic Generator
-Week 4 - Abnormal Traffic
+Week 4 - Task 1: Baseline Normal Traffic
+
+Combines the best of Playwright (async, concurrency, 80 users, 9 mistake types)
+and Faker (persona endpoint weights, client_type, user_agent, uuid4 session IDs,
+UTC timestamps, health/hello endpoints, variable admin sessions).
+
+Architecture:
+  - Playwright async engine — persistent browser per worker slot
+  - 80 users registered at startup (all get wallet + bank account via backend fix)
+  - 9 mistake types at 8% session rate
+  - 4 personas with per-endpoint probability weights
+  - All 20 endpoints covered
+  - 20 CSV columns (17 base + client_type + user_agent + source_tool)
+
+notes applied:
+  - session_id = uuid4 (consistent, groupable for feature engineering)
+  - timestamp  = UTC ISO format (consistent across all tools)
+  - source_tool column for merge traceability
+  - Clear session summaries printed to console
+
+Install:
+    pip install playwright faker
+    playwright install chromium
 
 Run:
     python generate_traffic.py
@@ -31,7 +53,7 @@ NUM_USERS          = 80
 NUM_SESSIONS       = 280
 NUM_ADMIN_SESSIONS = 20
 MAX_CONCURRENT     = 20
-CSV_FILE           = "traffic_log.csv"
+CSV_FILE           = "dataset/output/traffic_log.csv"
 SOURCE_TOOL        = "playwright"
 
 MISTAKE_SESSION_RATE = 0.08
@@ -776,28 +798,10 @@ async def run_session(ctx) -> None:
     ct           = user.get("client_type", pick_client_type())
     ua           = user.get("user_agent",  pick_user_agent())
 
-    session_type = random.choices(
-        ["normal", "suspicious", "fraud"],
-        weights=[80, 15, 5],
-        k=1
-    )[0]
-
+   
     # Stagger start — creates genuine server load contention for RT variance
     await asyncio.sleep(random.uniform(0, 8))
 
-    # ── Abnormal session routing ──
-    if session_type == "suspicious":
-        await run_suspicious_session(
-            ctx, sid, user, email, password, geo, ct, ua, persona_name, persona
-        )
-        return
-
-    if session_type == "fraud":
-        await run_fraud_session(
-            ctx, sid, user, email, password, geo, ct, ua, persona_name, persona
-        )
-        return
-    
     # Decide mistake for this session
     mistake = pick_mistake() if random.random() < MISTAKE_SESSION_RATE else None
 
@@ -854,295 +858,6 @@ async def run_session(ctx) -> None:
                            response_length=r_len, geo_location=geo,
                            client_type=ct, user_agent=ua))
 
-async def run_suspicious_session(
-    ctx, sid, user, email, password, geo, ct, ua, persona_name, persona
-) -> None:
-    """
-    Suspicious behaviour:
-    - repeated failed logins
-    - probing admin endpoints without admin token
-    - rapid auth/me checks
-    """
-
-    # 1) repeated failed logins
-    for _ in range(random.randint(4, 8)):
-        r, rt, bs, r_len = await api_post(
-            ctx,
-            "/auth/sign-in",
-            {"email": email, "password": "wrong_password"},
-            client_type=ct,
-            user_agent=ua
-        )
-        status = r.status if r else "ERR"
-
-        clog(sid, email, "POST auth/sign-in [SUSPICIOUS]", status, rt)
-        await log_row(make_row(
-            sid, persona_name, email, "unknown", "failed_login_suspicious",
-            "POST", "/auth/sign-in", status,
-            is_failed_login=True,
-            response_time_ms=rt,
-            body_size=bs,
-            response_length=r_len,
-            geo_location=geo,
-            client_type=ct,
-            user_agent=ua,
-        ))
-
-        await asyncio.sleep(random.uniform(0.1, 0.5))
-
-    # 2) maybe successful login after failures
-    r, rt, bs, r_len = await api_post(
-        ctx,
-        "/auth/sign-in",
-        {"email": email, "password": password},
-        client_type=ct,
-        user_agent=ua
-    )
-
-    if not r or r.status != 200:
-        status = r.status if r else "ERR"
-        clog(sid, email, "POST auth/sign-in [SUSPICIOUS FINAL]", status, rt)
-        await log_row(make_row(
-            sid, persona_name, email, "unknown", "sign_in_suspicious",
-            "POST", "/auth/sign-in", status,
-            response_time_ms=rt,
-            body_size=bs,
-            response_length=r_len,
-            geo_location=geo,
-            client_type=ct,
-            user_agent=ua,
-        ))
-        return
-
-    body = await r.json()
-    token = body.get("token")
-    user_id = body.get("user_id")
-
-    await log_row(make_row(
-        sid, persona_name, email, user_id, "sign_in_suspicious",
-        "POST", "/auth/sign-in", 200,
-        response_time_ms=rt,
-        body_size=bs,
-        response_length=r_len,
-        geo_location=geo,
-        client_type=ct,
-        user_agent=ua,
-    ))
-
-    # 3) probe admin endpoints with no admin token
-    suspicious_paths = [
-        "/admin/users",
-        "/admin/wallets",
-        "/admin/transactions",
-        "/admin/overview/financial",
-    ]
-
-    for path in suspicious_paths:
-        r, rt, r_len = await api_get(
-            ctx, path,
-            client_type=ct,
-            user_agent=ua
-        )
-        status = r.status if r else "ERR"
-
-        clog(sid, email, f"GET {path} [SUSPICIOUS]", status, rt)
-        await log_row(make_row(
-            sid, persona_name, email, user_id, "admin_probe",
-            "GET", path, status,
-            response_time_ms=rt,
-            has_auth_token=False,
-            response_length=r_len,
-            geo_location=geo,
-            client_type=ct,
-            user_agent=ua,
-        ))
-
-        await asyncio.sleep(random.uniform(0.1, 0.4))
-
-    # 4) rapid auth/me checks
-    for _ in range(random.randint(3, 6)):
-        r, rt, r_len = await api_get(
-            ctx, "/auth/me",
-            token=token,
-            client_type=ct,
-            user_agent=ua
-        )
-        status = r.status if r else "ERR"
-
-        clog(sid, email, "GET /auth/me [SUSPICIOUS]", status, rt)
-        await log_row(make_row(
-            sid, persona_name, email, user_id, "auth_me_suspicious",
-            "GET", "/auth/me", status,
-            response_time_ms=rt,
-            has_auth_token=True,
-            response_length=r_len,
-            geo_location=geo,
-            client_type=ct,
-            user_agent=ua,
-        ))
-
-        await asyncio.sleep(random.uniform(0.05, 0.2))
-
-    # logout
-    r, rt, _, r_len = await api_post(
-        ctx, "/auth/sign-out",
-        token=token,
-        client_type=ct,
-        user_agent=ua
-    )
-    status = r.status if r else "ERR"
-
-    await log_row(make_row(
-        sid, persona_name, email, user_id, "sign_out_suspicious",
-        "POST", "/auth/sign-out", status,
-        response_time_ms=rt,
-        has_auth_token=True,
-        response_length=r_len,
-        geo_location=geo,
-        client_type=ct,
-        user_agent=ua,
-    ))
-
-async def run_fraud_session(
-    ctx, sid, user, email, password, geo, ct, ua, persona_name, persona
-) -> None:
-    """
-    Fraud-like behaviour:
-    - normal login
-    - rapid sequence of topup / transfer / withdraw / pay-bill
-    - little think time
-    """
-
-    r, rt, bs, r_len = await api_post(
-        ctx,
-        "/auth/sign-in",
-        {"email": email, "password": password},
-        client_type=ct,
-        user_agent=ua
-    )
-
-    if not r or r.status != 200:
-        status = r.status if r else "ERR"
-        await log_row(make_row(
-            sid, persona_name, email, "unknown", "sign_in_fraud",
-            "POST", "/auth/sign-in", status,
-            response_time_ms=rt,
-            body_size=bs,
-            response_length=r_len,
-            geo_location=geo,
-            client_type=ct,
-            user_agent=ua,
-        ))
-        return
-
-    body = await r.json()
-    token = body.get("token")
-    user_id = body.get("user_id")
-
-    await log_row(make_row(
-        sid, persona_name, email, user_id, "sign_in_fraud",
-        "POST", "/auth/sign-in", 200,
-        response_time_ms=rt,
-        body_size=bs,
-        response_length=r_len,
-        geo_location=geo,
-        client_type=ct,
-        user_agent=ua,
-    ))
-
-    # rapid financial actions
-    for _ in range(random.randint(8, 15)):
-        action = random.choice(["topup", "withdraw", "transfer", "pay_bill"])
-
-        if action == "topup":
-            amount = round(random.uniform(50, 300), 2)
-            path = f"/users/{user_id}/wallet/topup"
-            r, rt, bs, r_len = await api_post(
-                ctx, path, {"amount": amount},
-                token=token,
-                client_type=ct,
-                user_agent=ua
-            )
-            method = "POST"
-            action_name = "topup_fraud"
-
-        elif action == "withdraw":
-            amount = round(random.uniform(20, 200), 2)
-            path = f"/users/{user_id}/wallet/withdraw"
-            r, rt, bs, r_len = await api_post(
-                ctx, path, {"amount": amount},
-                token=token,
-                client_type=ct,
-                user_agent=ua
-            )
-            method = "POST"
-            action_name = "withdraw_fraud"
-
-        elif action == "transfer":
-            targets = [u.get("id") for u in SEEDED_USERS if u.get("id") and u.get("id") != user_id]
-            if not targets:
-                targets = ["u_1001", "u_1002", "u_1003"]
-            target = random.choice(targets)
-            amount = round(random.uniform(30, 250), 2)
-            path = f"/users/{user_id}/wallet/transfer/{target}"
-            r, rt, bs, r_len = await api_post(
-                ctx, path, {"amount": amount},
-                token=token,
-                client_type=ct,
-                user_agent=ua
-            )
-            method = "POST"
-            action_name = "transfer_fraud"
-
-        else:
-            amount = round(random.uniform(10, 120), 2)
-            path = f"/users/{user_id}/wallet/pay-bill"
-            r, rt, bs, r_len = await api_post(
-                ctx, path, {"amount": amount},
-                token=token,
-                client_type=ct,
-                user_agent=ua
-            )
-            method = "POST"
-            action_name = "pay_bill_fraud"
-
-        status = r.status if r else "ERR"
-
-        clog(sid, email, f"{method} {path} [FRAUD]", status, rt)
-        await log_row(make_row(
-            sid, persona_name, email, user_id, action_name,
-            method, path, status,
-            response_time_ms=rt,
-            body_size=bs,
-            has_auth_token=True,
-            response_length=r_len,
-            geo_location=geo,
-            client_type=ct,
-            user_agent=ua,
-        ))
-
-        # very short pause = suspicious/fraud pattern
-        await asyncio.sleep(random.uniform(0.01, 0.15))
-
-    # logout
-    r, rt, _, r_len = await api_post(
-        ctx, "/auth/sign-out",
-        token=token,
-        client_type=ct,
-        user_agent=ua
-    )
-    status = r.status if r else "ERR"
-
-    await log_row(make_row(
-        sid, persona_name, email, user_id, "sign_out_fraud",
-        "POST", "/auth/sign-out", status,
-        response_time_ms=rt,
-        has_auth_token=True,
-        response_length=r_len,
-        geo_location=geo,
-        client_type=ct,
-        user_agent=ua,
-    ))
     
 # ─────────────────────────────────────────────
 # ADMIN SESSION RUNNER

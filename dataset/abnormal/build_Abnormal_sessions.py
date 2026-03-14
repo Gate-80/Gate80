@@ -1,6 +1,6 @@
 import pandas as pd
 
-df = pd.read_csv('traffic_log.csv')
+df = pd.read_csv('dataset/output/mixed_traffic_log.csv')
 df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
 
 print(f"Total requests loaded: {len(df)}")
@@ -114,7 +114,7 @@ print(f"Total sessions: {len(sessions_df)}")
 print(f"Sessions split by inactivity: {sessions_df['session_id'].str.contains('_part').sum()}")
 print(sessions_df.head())
 
-sessions_df.to_csv('AbnormalDataset/output/TrafficLog_abnormal_sessions.csv', index=False)
+sessions_df.to_csv('dataset/abnormal/output/TrafficLog_abnormal_sessions.csv', index=False)
 print("TrafficLog_abnormal_sessions.csv saved successfully!")
 
 print(sessions_df.info())

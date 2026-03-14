@@ -63,9 +63,9 @@ from datetime import datetime, timezone
 # ─────────────────────────────────────────────
 # CONFIG
 # ─────────────────────────────────────────────
-TRAFFIC_LOG_FILE  = "traffic_log.csv"
-SESSIONS_FILE     = "AbnormalDataset/output/TrafficLog_abnormal_sessions.csv"
-OUTPUT_FILE       = "AbnormalDataset/output/abnormal_sessions.csv"
+TRAFFIC_LOG_FILE = "dataset/output/mixed_traffic_log.csv"
+SESSIONS_FILE     = "dataset/abnormal/output/TrafficLog_abnormal_sessions.csv"
+OUTPUT_FILE       = "dataset/abnormal/output/abnormal_sessions.csv"
 
 WALLET_ACTIONS = {
     "wallet_view", "topup", "withdraw", "transfer", "pay_bill",
