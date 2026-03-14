@@ -1,7 +1,9 @@
 
 import math
 import time
-import pickle
+from turtle import pd
+import pandas as pd
+import joblib
 import logging
 import threading
 from dataclasses import dataclass, field
@@ -10,6 +12,17 @@ from typing import Optional, Dict, Tuple
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Detection thresholds
+# Derived from baseline_sessions.csv (426 normal sessions):
+#   - MIN_REQUESTS: model was trained on sessions with min=3 requests,
+#     scoring below this has no comparable training data
+#   - SCORE_THRESHOLD: mean(0.077) - 2*std(0.045) = -0.013
+#     covers 95% of normal sessions, reduces false positives
+# ─────────────────────────────────────────────────────────────────────────────
+MIN_REQUESTS_BEFORE_SCORING = 3
+ANOMALY_SCORE_THRESHOLD = -0.013
 
 FEATURE_NAMES = [
     "total_requests",
@@ -62,17 +75,20 @@ class AnomalyDetector:
         self._sessions: Dict[str, SessionState] = {}
 
         logger.info("GATE80 ▶ loading model  : %s", model_path)
-        with open(model_path, "rb") as f:
-            self.model = pickle.load(f)
+        self.model = joblib.load(model_path)
 
         logger.info("GATE80 ▶ loading scaler : %s", scaler_path)
-        with open(scaler_path, "rb") as f:
-            self.scaler = pickle.load(f)
+        self.scaler = joblib.load(scaler_path)
 
         logger.info(
             "GATE80 ✅ detector ready — %d estimators, contamination=%.2f",
             self.model.n_estimators,
             self.model.contamination,
+        )
+        logger.info(
+            "GATE80 ✅ thresholds — min_requests=%d, score_threshold=%.3f",
+            MIN_REQUESTS_BEFORE_SCORING,
+            ANOMALY_SCORE_THRESHOLD,
         )
 
     # ── Session lifecycle ─────────────────────────────────────────────────────
@@ -146,17 +162,27 @@ class AnomalyDetector:
             if s is None:
                 return False, 0.0
 
+            # Sticky flag — once anomalous always anomalous
             if s.is_anomalous:
                 return True, s.anomaly_score
 
+            # Not enough requests yet — don't score
+            if s.total_requests < MIN_REQUESTS_BEFORE_SCORING:
+                logger.debug(
+                    "GATE80 ⏳ session %s has %d requests — waiting for %d",
+                    session_id, s.total_requests, MIN_REQUESTS_BEFORE_SCORING,
+                )
+                return False, 0.0
+
             vec = _build_feature_vector(s)
 
-        x = np.array(vec, dtype=float).reshape(1, -1)
+        x = pd.DataFrame([vec], columns=FEATURE_NAMES)
         x_scaled = self.scaler.transform(x)
 
         raw_score = float(self.model.decision_function(x_scaled)[0])
-        label = int(self.model.predict(x_scaled)[0])
-        is_anomalous = label == -1
+
+        # Apply score threshold — stricter than default 0 cutoff
+        is_anomalous = raw_score < ANOMALY_SCORE_THRESHOLD
 
         with self._lock:
             s = self._sessions.get(session_id)
@@ -166,9 +192,10 @@ class AnomalyDetector:
                     s.is_anomalous = True
                     s.flagged_at = time.time()
                     logger.warning(
-                        "GATE80 🚨 anomalous session flagged: %s  (score=%.4f)",
+                        "GATE80 🚨 anomalous session flagged: %s  (score=%.4f, threshold=%.3f)",
                         session_id,
                         raw_score,
+                        ANOMALY_SCORE_THRESHOLD,
                     )
 
         return is_anomalous, raw_score
