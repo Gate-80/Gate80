@@ -1,6 +1,3 @@
-"""
-GATE80 — Adaptive API Deception System
-"""
 
 import os
 import time
@@ -9,6 +6,8 @@ import logging
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
 from proxy.db.database import SessionLocal, init_db
 from proxy.db.logger import db_log
@@ -27,10 +26,14 @@ logger = logging.getLogger("proxy")
 # ─────────────────────────────────────────────────────────────────────────────
 # Configuration
 # ─────────────────────────────────────────────────────────────────────────────
-BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
-DECOY_URL   = os.getenv("DECOY_URL",   "http://127.0.0.1:8001")
-MODEL_PATH  = os.getenv("MODEL_PATH",  "model/isolation_forest.pkl")
-SCALER_PATH = os.getenv("SCALER_PATH", "model/scaler.pkl")
+BACKEND_URL  = os.getenv("BACKEND_URL",  "http://127.0.0.1:8000")
+DECOY_URL    = os.getenv("DECOY_URL",    "http://127.0.0.1:8001")
+MODEL_PATH   = os.getenv("MODEL_PATH",   "model/isolation_forest.pkl")
+SCALER_PATH  = os.getenv("SCALER_PATH",  "model/scaler.pkl")
+
+# Paths to both databases for token mirroring
+BACKEND_DB_PATH = os.getenv("BACKEND_DB_PATH", "digital_wallet.db")
+DECOY_DB_PATH   = os.getenv("DECOY_DB_PATH",   "decoy_wallet.db")
 
 HOP_BY_HOP_HEADERS = {
     "connection", "keep-alive", "proxy-authenticate",
@@ -51,13 +54,17 @@ app = FastAPI(
 http_client = httpx.AsyncClient(timeout=30.0)
 detector: AnomalyDetector | None = None
 
+# Separate DB sessions for token mirroring
+_backend_session_factory = None
+_decoy_session_factory   = None
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Startup / shutdown
 # ─────────────────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 def startup_event():
-    global detector
+    global detector, _backend_session_factory, _decoy_session_factory
 
     init_db()
     logger.info("✅ Proxy database initialised")
@@ -70,10 +77,118 @@ def startup_event():
             MODEL_PATH, SCALER_PATH,
         )
 
+    # Set up direct DB connections for token mirroring
+    if os.path.exists(BACKEND_DB_PATH):
+        engine = create_engine(f"sqlite:///{BACKEND_DB_PATH}", connect_args={"check_same_thread": False})
+        _backend_session_factory = sessionmaker(bind=engine)
+        logger.info("✅ Backend DB connected for token mirroring")
+    else:
+        logger.warning("⚠️  Backend DB not found — token mirroring disabled")
+
+    if os.path.exists(DECOY_DB_PATH):
+        engine = create_engine(f"sqlite:///{DECOY_DB_PATH}", connect_args={"check_same_thread": False})
+        _decoy_session_factory = sessionmaker(bind=engine)
+        logger.info("✅ Decoy DB connected for token mirroring")
+    else:
+        logger.warning("⚠️  Decoy DB not found — token mirroring disabled")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     await http_client.aclose()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Token mirroring
+# ─────────────────────────────────────────────────────────────────────────────
+def mirror_token_to_decoy(token: str) -> None:
+    """
+    When a session is flagged, copy the real token and its user_id
+    into decoy_wallet.db so the attacker's subsequent requests are
+    recognized by the decoy without any disruption.
+    """
+    if not _backend_session_factory or not _decoy_session_factory:
+        return
+
+    try:
+        # Look up the token in the real backend DB
+        backend_db = _backend_session_factory()
+        row = backend_db.execute(
+            text("SELECT user_id FROM user_sessions WHERE token = :token"),
+            {"token": token}
+        ).fetchone()
+        backend_db.close()
+
+        if not row:
+            logger.debug("Token not found in backend DB — skipping mirror")
+            return
+
+        user_id = row[0]
+
+        # Look up the user in the real backend DB
+        backend_db = _backend_session_factory()
+        user = backend_db.execute(
+            text("SELECT id, full_name, email, phone, city, is_verified FROM users WHERE id = :uid"),
+            {"uid": user_id}
+        ).fetchone()
+        backend_db.close()
+
+        decoy_db = _decoy_session_factory()
+
+        # Insert user into decoy DB if not already there
+        existing_user = decoy_db.execute(
+            text("SELECT id FROM users WHERE id = :uid"),
+            {"uid": user_id}
+        ).fetchone()
+
+        if not existing_user and user:
+            decoy_db.execute(
+                text("INSERT INTO users (id, full_name, email, password, phone, city, is_verified) VALUES (:id, :full_name, :email, :password, :phone, :city, :is_verified)"),
+                {
+                    "id":          user[0],
+                    "full_name":   user[1],
+                    "email":       user[2],
+                    "password":    "mirrored",
+                    "phone":       user[3],
+                    "city":        user[4],
+                    "is_verified": user[5],
+                }
+            )
+
+            # Create a wallet for the mirrored user if not exists
+            existing_wallet = decoy_db.execute(
+                text("SELECT id FROM wallets WHERE user_id = :uid"),
+                {"uid": user_id}
+            ).fetchone()
+
+            if not existing_wallet:
+                decoy_db.execute(
+                    text("INSERT INTO wallets (id, user_id, currency_code, balance, status) VALUES (:id, :user_id, 'SAR', '2500.00', 'ACTIVE')"),
+                    {"id": f"w_mirror_{user_id}", "user_id": user_id}
+                )
+
+        # Mirror the session token
+        existing_token = decoy_db.execute(
+            text("SELECT token FROM user_sessions WHERE token = :token"),
+            {"token": token}
+        ).fetchone()
+
+        if not existing_token:
+            decoy_db.execute(
+                text("INSERT INTO user_sessions (token, user_id) VALUES (:token, :user_id)"),
+                {"token": token, "user_id": user_id}
+            )
+
+        decoy_db.commit()
+        decoy_db.close()
+
+        logger.info(
+            "GATE80 🪞 token mirrored to decoy: user_id=%s token=%s...",
+            user_id, token[:8]
+        )
+
+    except Exception as e:
+        logger.error("GATE80 ❌ token mirroring failed: %s", e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -87,10 +202,6 @@ def get_client_ip(request: Request) -> str:
 
 
 def get_session_id(request: Request) -> str:
-    """
-    Derive a stable session identity from the request.
-    Priority: X-User-Token → X-Admin-Token → client IP
-    """
     user_token  = request.headers.get("X-User-Token")
     admin_token = request.headers.get("X-Admin-Token")
     if user_token:
@@ -101,7 +212,6 @@ def get_session_id(request: Request) -> str:
 
 
 def build_forward_headers(request: Request) -> dict:
-    """Strip hop-by-hop headers and add proxy marker."""
     headers = {
         k: v
         for k, v in request.headers.items()
@@ -112,7 +222,6 @@ def build_forward_headers(request: Request) -> dict:
 
 
 async def forward(request: Request, body: bytes, target_url: str) -> httpx.Response:
-    """Forward a request to target_url and return the raw httpx response."""
     return await http_client.request(
         method=request.method,
         url=target_url,
@@ -158,7 +267,6 @@ async def reverse_proxy(request: Request, path: str):
     body_str = body.decode("utf-8", errors="ignore") if body else None
     db       = SessionLocal()
 
-    # Check if this session was already flagged in a previous request
     pre_flagged = False
     if detector is not None:
         state = detector.get_or_create_session(sid)
@@ -232,7 +340,11 @@ async def reverse_proxy(request: Request, path: str):
                 else:
                     is_anomalous, score = False, 0.0
 
+                # ── Mirror token to decoy when first flagged ──────────────────
                 if is_anomalous:
+                    token = request.headers.get("X-User-Token")
+                    if token:
+                        mirror_token_to_decoy(token)
                     logger.warning(
                         "GATE80 🚨 [FLAGGED] sid=%-40s score=%.4f "
                         "→ next requests → decoy",
