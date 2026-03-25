@@ -3,30 +3,29 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# SQLite database file for proxy logs
 SQLALCHEMY_DATABASE_URL = "sqlite:///./proxy_logs.db"
 
-# Create engine
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False}  # Needed for SQLite
+    connect_args={"check_same_thread": False}
 )
 
-# Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Base class for models
 Base = declarative_base()
 
 
 def init_db():
-    """Initialize database - create all tables"""
+    """
+    Create all tables in proxy_logs.db.
+    Includes both ProxyRequest and DecoyRequest so the single DB
+    holds the full attack timeline correlatable by session_id.
+    """
     from proxy.db.models import ProxyRequest
+    from decoy_api.db.log_models import DecoyRequest
     Base.metadata.create_all(bind=engine)
 
 
 def get_db():
-    """Dependency to get database session"""
     db = SessionLocal()
     try:
         yield db

@@ -2,9 +2,10 @@
 GATE80 — Decoy API
 db/database.py
 
-Two separate databases:
+Two databases:
   - decoy_wallet.db  → fake wallet state (users, wallets, transactions)
-  - decoy_logs.db    → attacker interaction logs
+  - proxy_logs.db    → unified log DB (proxy + decoy interactions)
+                       shared with proxy so events correlate by session_id
 """
 
 from sqlalchemy import create_engine
@@ -12,7 +13,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Wallet DB — fake state
+# Wallet DB — fake state (decoy only)
 # ─────────────────────────────────────────────────────────────────────────────
 WALLET_DB_URL = "sqlite:///./decoy_wallet.db"
 
@@ -33,16 +34,16 @@ def get_wallet_db():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Logs DB — attacker interaction logs
+# Logs DB — unified, shared with proxy
+# DecoyRequest table lives in proxy_logs.db alongside ProxyRequest
 # ─────────────────────────────────────────────────────────────────────────────
-LOGS_DB_URL = "sqlite:///./decoy_logs.db"
+LOGS_DB_URL = "sqlite:///./proxy_logs.db"
 
 logs_engine = create_engine(
     LOGS_DB_URL,
     connect_args={"check_same_thread": False}
 )
 LogsSession = sessionmaker(autocommit=False, autoflush=False, bind=logs_engine)
-LogsBase = declarative_base()
 
 
 def get_logs_db():
@@ -63,5 +64,9 @@ def init_db():
     )
     from decoy_api.db.log_models import DecoyRequest
 
+    # Wallet state in decoy_wallet.db
     WalletBase.metadata.create_all(bind=wallet_engine)
-    LogsBase.metadata.create_all(bind=logs_engine)
+
+    # DecoyRequest table in proxy_logs.db — uses proxy's Base
+    from proxy.db.database import Base
+    Base.metadata.create_all(bind=logs_engine)
