@@ -43,17 +43,18 @@ from typing import Dict, List, Optional, Tuple
 
 from faker import Faker
 from playwright.async_api import async_playwright
-
+from datetime import datetime, timezone
 # ─────────────────────────────────────────────
 # CONFIG
 # ─────────────────────────────────────────────
-BASE_URL           = "http://127.0.0.1:8080/api/v1"
-BASE_URL_ROOT      = "http://127.0.0.1:8080"      # for /health and /hello
+BASE_URL           = "http://127.0.0.1:8081/api/v1"
+BASE_URL_ROOT      = "http://127.0.0.1:8081"      # for /health and /hello
 NUM_USERS          = 80
-NUM_SESSIONS       = 280
-NUM_ADMIN_SESSIONS = 20
+NUM_SESSIONS       = 1900
+NUM_ADMIN_SESSIONS = 100
 MAX_CONCURRENT     = 20
-CSV_FILE           = "dataset/output/traffic_log.csv"
+RUN_ID = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+CSV_FILE = f"dataset/output/traffic_log_{RUN_ID}.csv"
 SOURCE_TOOL        = "playwright"
 
 MISTAKE_SESSION_RATE = 0.08

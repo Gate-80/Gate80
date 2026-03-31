@@ -59,13 +59,15 @@ import csv
 import math
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
+from datetime import datetime, timezone
 
+RUN_ID = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 # ─────────────────────────────────────────────
 # CONFIG
 # ─────────────────────────────────────────────
-TRAFFIC_LOG_FILE  = "dataset/output/traffic_log.csv"
+TRAFFIC_LOG_FILE  = "dataset/output/traffic_log_20260327_124508.csv"
 SESSIONS_FILE     = "dataset/output/sessions_features.csv"
-OUTPUT_FILE       = "dataset/output/baseline_sessions.csv"
+OUTPUT_FILE   = f"dataset/output/baseline_sessions_{RUN_ID}.csv"
 
 WALLET_ACTIONS = {
     "wallet_view", "topup", "withdraw", "transfer", "pay_bill",
@@ -247,8 +249,7 @@ for session_id, requests in sessions_requests.items():
     min_think_time_ms    = min(think_times) if think_times else 0
 
     # Skip incomplete sessions (crashed after sign_in only)
-    if total_requests <= 1:
-        continue
+    if total_requests <= 1: continue
 
     # ── Assemble row ──
     output_rows.append({

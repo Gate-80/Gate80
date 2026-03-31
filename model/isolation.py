@@ -1,57 +1,33 @@
 import pandas as pd
-import os
-import matplotlib.pyplot as plt
-import seaborn as sns
+import numpy as np
 import joblib
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import IsolationForest
 
-df = pd.read_csv("dataset/output/baseline_sessions.csv")
-#print(df.dtypes)
-# numeric statistics
-#stats = df.describe()
-#print(stats)
+# -----------------------------
+# 1. Load baseline training data
+# -----------------------------
+df = pd.read_csv("dataset/output/baseline_sessions.csv").copy()
 
-# check missing values
-#print(df.isnull().sum())
+# -----------------------------
+# 2. Add derived features
+# -----------------------------
+df["requests_per_second"] = (
+    df["total_requests"] / df["session_duration_sec"].replace(0, np.nan)
+).fillna(0)
 
+df["error_count"] = df["error_ratio"] * df["total_requests"]
 
-
-#features = [
-   # "requests_per_minute",
-    #"session_duration_sec",
-    #"error_ratio",
-    #"endpoint_entropy",
-   # "avg_think_time_ms",
-    #"unique_endpoints"
-#]
-
-#for f in features:
-   # plt.figure()
-    #df[f].hist(bins=30)
-    #plt.title(f"Distribution of {f}")
-    #plt.xlabel(f)
-    #plt.ylabel("Frequency")
-    #plt.show()
-
-#print(df.skew(numeric_only=True))
-#print(df.kurtosis(numeric_only=True))
-
-
-#corr = df.corr(numeric_only=True)
-#sns.heatmap(corr)
-#plt.show()
-#Q1 = df.quantile(0.25)
-#Q3 = df.quantile(0.75)
-#IQR = Q3 - Q1
-#outliers = ((df < (Q1 - 1.5*IQR)) | (df > (Q3 + 1.5*IQR))).sum()
-#print(outliers)
-
-featuress = [
+# -----------------------------
+# 3. Feature list
+# -----------------------------
+features = [
     "total_requests",
     "session_duration_sec",
     "requests_per_minute",
+    "requests_per_second",
     "error_ratio",
+    "error_count",
     "unique_endpoints",
     "endpoint_entropy",
     "admin_action_count",
@@ -65,50 +41,49 @@ featuress = [
     "avg_response_time_ms"
 ]
 
-X = df[featuress].copy()
+X = df[features].copy()
 
+# -----------------------------
+# 4. Scale
+# -----------------------------
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
-# train Isolation Forest
+# -----------------------------
+# 5. Train model
+# -----------------------------
 model = IsolationForest(
-    n_estimators=200,
-    contamination=0.08,   # between 5% and 10%
+    n_estimators=500,
+    contamination=0.05,
     random_state=42
 )
 
 model.fit(X_scaled)
 
-
-
-# save trained model
+# -----------------------------
+# 6. Save artifacts
+# -----------------------------
 joblib.dump(model, "model/isolation_forest.pkl")
-
-# save scaler
 joblib.dump(scaler, "model/scaler.pkl")
 
-# anomaly scores and labels
+# -----------------------------
+# 7. Quick inspection
+# -----------------------------
 df["anomaly_score"] = model.decision_function(X_scaled)
 df["anomaly_label"] = model.predict(X_scaled)
 
-# check anomaly proportion
-print("\nAnomaly distribution:")
+print("\nTraining anomaly distribution:")
 print(df["anomaly_label"].value_counts())
 
-# show most abnormal sessions
-print("\nTop anomalous sessions:")
-print(df.sort_values("anomaly_score").head(20))
-
-
-print(df["anomaly_label"].value_counts())
-
-# show suspicious rows
-anomalies = df[df["anomaly_label"] == -1]
-print("\nDetected anomalies:")
-print(anomalies[[
-    "requests_per_minute",
-    "error_ratio",
-    "admin_action_count",
-    "avg_response_time_ms",
-    "anomaly_score"
-]].head(20))
+print("\nMost anomalous baseline sessions:")
+print(
+    df.sort_values("anomaly_score")[
+        [
+            "requests_per_minute",
+            "error_ratio",
+            "admin_action_count",
+            "avg_think_time_ms",
+            "anomaly_score"
+        ]
+    ].head(20)
+)
