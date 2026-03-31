@@ -7,11 +7,12 @@ GATE80 aims to enhance API security by intercepting API traffic, analyzing reque
 
 At a high level, the system:
 - Intercepts incoming API traffic using a reverse proxy
-- Analyzes request behavior using machine learning and threat intelligence
+- Analyzes request behavior using machine learning (Isolation Forest)
 - Dynamically decides whether traffic is legitimate or suspicious
 - Forwards legitimate traffic to real backend services
 - Redirects suspicious traffic to realistic digital-twin API decoys
-- Collects logs and attacker interaction data for analysis
+- Mirrors attacker sessions seamlessly so deception is undetectable
+- Collects logs and attacker interaction data for analysis and correlation
 
 This project is developed for **academic and research purposes**.
 
@@ -20,70 +21,70 @@ This project is developed for **academic and research purposes**.
 ## System Components
 The GATE80 system consists of the following components:
 
-- **Customer Backend APIs** – Realistic backend services protected by GATE80  
-- **Reverse Proxy Layer** – Intercepts and controls all incoming API traffic  
-- **Digital-Twin API Decoys** – Synthetic APIs that replicate real endpoint behavior  
-- **Anomaly Detection Engine** – Identifies abnormal or suspicious API behavior  
-- **Threat Intelligence Integration** – Enriches traffic analysis using known threat data  
-- **Adaptive Decision Engine** – Determines how each request is handled  
-- **Monitoring & Dashboard** – Provides logs, alerts, and visibility into interactions  
+- **Customer Backend APIs** – Realistic backend services protected by GATE80
+- **Reverse Proxy Layer** – Intercepts and controls all incoming API traffic
+- **Anomaly Detection Engine** – Isolation Forest model scoring sessions in real time
+- **Digital-Twin API Decoys** – Stateful APIs that replicate real endpoint behavior
+- **Threat Intelligence Integration** – Enriches traffic analysis using known threat data
+- **Adaptive Decision Engine** – Determines how each request is handled
+- **Monitoring & Dashboard** – ELK Stack (Elasticsearch, Logstash, Kibana)
 
 ---
 
 ## Customer Backend APIs
-Customer backend APIs represent the applications being protected by the GATE80 system.  
-These APIs are intentionally designed to be realistic, consistent, and worth interacting with.
 
 ### Digital Wallet API
-A **Digital Wallet backend system** is implemented as a representative customer API.  
+A **Digital Wallet backend system** is implemented as a representative customer API.
 It simulates common functionality found in fintech and financial applications.
-
 
 ### Available Endpoints
 
 #### User Accounts
-- View user profile  
-- Update user profile  
-- Add bank account  
-- View bank accounts  
-- Update bank account  
+- View user profile
+- Update user profile
+- Add bank account
+- View bank accounts
+- Update bank account
 
 #### Wallet Operations
-- View wallet balance  
-- Transfer funds to another user  
-- Transfer funds to bank account  
-- Top up wallet balance  
-- Withdraw funds  
-- Pay bills  
+- View wallet balance
+- Transfer funds to another user
+- Transfer funds to bank account
+- Top up wallet balance
+- Withdraw funds
+- Pay bills
 
 #### Payments/Transactions
-- View user payments  
-- View payment details  
+- View user payments
+- View payment details
 
 #### Admin Operations
-- View all registered users  
-- View all wallets  
-- View all transactions  
-- View system financial overview  
+- View all registered users
+- View all wallets
+- View all transactions
+- View system financial overview
 
 #### User Authentication
-- User sign up  
-- User sign in  
+- User sign up
+- User sign in
 - User sign out
 
 #### Admin Authentication
-- Admin sign in  
-- Admin sign out  
+- Admin sign in
+- Admin sign out
 
 ---
 
 ## API Reference
+
 Interactive API documentation is available through **Swagger UI** once the backend server is running.
 
 ![Swagger – User Accounts](docs/images/swagger-users.png)
 
+
 ---
-## Technology Stack (Current Phase)
+
+## Technology Stack
 
 | Component | Technology |
 |-----------|------------|
@@ -93,39 +94,48 @@ Interactive API documentation is available through **Swagger UI** once the backe
 | Server | Uvicorn |
 | Database | SQLite + SQLAlchemy ORM |
 | Proxy | FastAPI Reverse Proxy (httpx) |
+| Anomaly Detection | Isolation Forest (scikit-learn) |
+| DB Migrations | Alembic |
+| Monitoring | ELK Stack (Elasticsearch, Logstash, Kibana) |
 
 ---
 
 ## Architecture
+
 ```
 User / Client
      │
      ▼
-┌────────────────────────────────────┐
-│   Reverse Proxy (:8080)            │  ← All traffic enters here
-│   - Logs to proxy_logs.db          │
-│   - Forwards to backend            │
-│   - Adds X-From-Proxy              │
-└─────────────────┬──────────────────┘
-                  │
-                  ▼
-┌────────────────────────────────────┐
-│   Backend API (:8000)              │  ← Only accessible through proxy
-│   - Validates proxy header         │
-│   - Processes requests             │
-│   - Logs to digital_wallet.db      │
-└─────────────────┬──────────────────┘
-                  │
-                  ▼
-┌────────────────────────────────────┐
-│   Two Separate Databases           │
-├────────────────────────────────────┤
-│  digital_wallet.db                 │
-│  └─ Customer data & audit          │
-│                                    │
-│  proxy_logs.db                     │
-│  └─ GATE80 traffic logs            │
-└────────────────────────────────────┘
+┌────────────────────────────────────────────────┐
+│   Reverse Proxy (:8080)                        │  ← All traffic enters here
+│   - Session tracking (token or IP)             │
+│   - Behavioral feature extraction              │
+│   - Isolation Forest anomaly scoring           │
+│   - Adaptive routing decision                  │
+│   - Token mirroring on flag                    │
+│   - Logs to proxy_logs.db                      │
+└──────────┬──────────────────┬──────────────────┘
+           │ normal           │ anomalous
+           ▼                  ▼
+┌──────────────────┐  ┌──────────────────────────┐
+│ Backend API      │  │ Decoy API (:8001)         │
+│ (:8000)          │  │ - Stateful fake wallet    │
+│ - Real data      │  │ - Realistic responses     │
+│ - digital_       │  │ - Captures attacker       │
+│   wallet.db      │  │   behavior                │
+└──────────────────┘  │ - decoy_wallet.db         │
+                      └──────────────────────────┘
+                               │
+                    ┌──────────────────────┐
+                    │    proxy_logs.db      │
+                    │  ┌────────────────┐  │
+                    │  │ proxy_requests │  │ ← routing decisions
+                    │  ├────────────────┤  │
+                    │  │ decoy_requests │  │ ← attacker behavior
+                    │  └────────────────┘  │
+                    │  correlate by        │
+                    │  session_id          │
+                    └──────────────────────┘
 ```
 
 **Security Model:**
@@ -133,21 +143,22 @@ User / Client
 - All requests must pass through the proxy (`X-From-Proxy: 1` header)
 - Only the `/health` endpoint is accessible directly on the backend
 - All state-changing operations are logged to the audit table
+- Flagged sessions are silently redirected — attacker cannot detect the deception
 
 ---
 
 ## Repository Structure
 
 ```
-GATE80_adaptive-api-deception/
+GATE80/
 │
-├── backend_api/                  # Customer backend API
-│   ├── main.py                   # FastAPI app, middleware, router registration
+├── backend_api/                   # Customer backend API
+│   ├── main.py
 │   ├── db/
-│   │   ├── database.py           # SQLAlchemy engine and session setup
-│   │   ├── models.py             # ORM models (User, Wallet, Transaction, etc.)
-│   │   ├── audit_helper.py       # Audit logging helper functions
-│   │   └── seed_data.py          # Database seeding script
+│   │   ├── database.py
+│   │   ├── models.py
+│   │   ├── audit_helper.py
+│   │   └── seed_data.py
 │   └── routers/
 │       ├── user_authentication.py
 │       ├── admin_authentication.py
@@ -155,21 +166,72 @@ GATE80_adaptive-api-deception/
 │       ├── wallet.py
 │       └── admin_operations.py
 │
-├── proxy/                        # Reverse proxy layer
-│   ├── main.py                   # Transparent reverse proxy (httpx)
+├── proxy/                         # Reverse proxy + anomaly routing
+│   ├── main.py                    # Proxy, detection integration, token mirroring
 │   ├── db/
-│   │   ├── database.py           # Proxy database connection
-│   │   ├── models.py             # ProxyRequest model
-│   │   └── logger.py             # Request logging helper
+│   │   ├── database.py
+│   │   ├── models.py
+│   │   └── logger.py
 │   └── __init__.py
 │
-├── dashboard/                    # Monitoring dashboard
-├── detection/                    # Anomaly detection engine
-├── decoy_api/                    # Digital-twin decoy APIs
-├── digital_wallet.db             # Backend database (auto-created on startup)
-├── proxy_logs.db                 # Proxy logs database (auto-created on startup)
-├── requirements.txt              # Python dependencies
-└── README.md
+├── detection/                     # Anomaly detection engine
+│   ├── __init__.py
+│   └── model.py                   # AnomalyDetector, SessionState, 15 features
+│
+├── decoy_api/                     # Digital-twin decoy API
+│   ├── main.py
+│   ├── seed.py
+│   ├── logger.py
+│   ├── db/
+│   │   ├── database.py
+│   │   ├── models.py
+│   │   └── log_models.py
+│   └── routers/
+│       ├── auth.py
+│       ├── admin_auth.py
+│       ├── wallet.py
+│       ├── user_accounts.py
+│       └── admin.py
+│
+├── dataset/                       # Traffic generation and feature engineering
+│   ├── generate_normal_traffic.py
+│   ├── generate_mixed_traffic.py
+│   ├── build_session.py
+│   ├── feature_engineering.py
+│   ├── abnormal/
+│   │   ├── build_Abnormal_sessions.py
+│   │   ├── feature_engineering_abnormal.py
+│   │   └── output/
+│   └── output/
+│       ├── traffic_log.csv
+│       ├── mixed_traffic_log.csv
+│       ├── sessions_features.csv
+│       └── baseline_sessions.csv
+│
+├── model/                         # Trained ML model
+│   ├── isolation.py               # Training script
+│   ├── testModel.py
+│   ├── checkdataset.py
+│   ├── isolation_forest.pkl       # Trained model
+│   └── scaler.pkl                 # Fitted StandardScaler
+│
+├── alembic/                       # DB migration management
+│   ├── env.py
+│   ├── script.py.mako
+│   └── versions/
+│       ├── 001_initial_schema.py
+│       └── 002_add_detection_columns.py
+│
+├── logstash/                      # ELK Stack pipeline
+│   └── pipeline.conf
+│
+├── logs/                          # Application logs
+├── docs/                          # Documentation
+├── alembic.ini
+├── digital_wallet.db              # Backend database (auto-created)
+├── proxy_logs.db                  # Unified log database (auto-created)
+├── decoy_wallet.db                # Decoy wallet state (auto-created)
+└── requirements.txt
 ```
 
 ---
@@ -177,7 +239,7 @@ GATE80_adaptive-api-deception/
 ## Setup & Installation
 
 ### Prerequisites
-- Python 3.9 or later
+- **Python 3.14+** (required — model pkl files are version-specific)
 - Git
 
 ### 1. Clone the Repository
@@ -190,9 +252,9 @@ cd GATE80_adaptive-api-deception
 ### 2. Create and Activate Virtual Environment
 
 ```bash
-python -m venv venv
-source venv/bin/activate        # macOS/Linux
-venv\Scripts\activate           # Windows
+python3 -m venv .venv
+source .venv/bin/activate        # macOS/Linux
+.venv\Scripts\activate           # Windows
 ```
 
 ### 3. Install Dependencies
@@ -201,15 +263,7 @@ venv\Scripts\activate           # Windows
 pip install -r requirements.txt
 ```
 
-Or manually:
-
-```bash
-pip install fastapi uvicorn sqlalchemy httpx pydantic[email]
-```
-
-### 4. Seed the Database
-
-Populate the database with test data (users, wallets, transactions, admin):
+### 4. Seed the Backend Database
 
 ```bash
 python -m backend_api.db.seed_data
@@ -228,56 +282,68 @@ Seeding database with test data...
 ✅ Database seeded successfully!
 ```
 
-### 5. Run the Backend Server
+### 5. Regenerate the ML Model
+
+> The model pkl files are Python version-specific. Always regenerate after cloning.
 
 ```bash
-uvicorn backend_api.main:app --reload --port 8000
+python model/isolation.py
 ```
 
-Expected output:
-```
-INFO:     Uvicorn running on http://127.0.0.1:8000
-✅ Database initialized
-INFO:     Application startup complete.
-```
-
-### 6. Run the Proxy Server
-
-Open a new terminal window:
+### 6. Run Database Migrations
 
 ```bash
-source venv/bin/activate
-uvicorn proxy.main:app --reload --port 8080
-```
-
-Expected output:
-```
-INFO:     Uvicorn running on http://127.0.0.1:8080
-INFO:     Application startup complete.
+alembic stamp 001
+alembic upgrade head
 ```
 
 ---
 
-## Testing the API
+## Running the System
+
+The system requires **three terminals** running simultaneously.
+
+### Terminal 1 — Backend API
+```bash
+uvicorn backend_api.main:app --reload --port 8000
+```
+Expected:
+```
+✅ Database initialized
+INFO: Application startup complete.
+```
+
+### Terminal 2 — Decoy API
+```bash
+uvicorn decoy_api.main:app --reload --port 8001
+```
+Expected:
+```
+GATE80 🪤 Decoy databases initialised
+GATE80 ✅ Seeded: 3 users, 3 wallets, 5 transactions...
+GATE80 🪤 Decoy API ready on :8001
+```
+
+### Terminal 3 — Proxy
+```bash
+uvicorn proxy.main:app --reload --port 8080
+```
+Expected:
+```
+✅ Proxy database initialised
+GATE80 ✅ detector ready — 200 estimators, contamination=0.08
+GATE80 ✅ thresholds — min_requests=3, score_threshold=-0.013
+✅ Backend DB connected for token mirroring
+✅ Decoy DB connected for token mirroring
+INFO: Application startup complete.
+```
 
 > ⚠️ **All API access must go through the proxy on port 8080.**
 > Direct backend access on port 8000 will return `403 Forbidden`.
 
-### Swagger UI
-```
-http://127.0.0.1:8080/docs
-```
+---
 
-### Health Check
-```
-http://127.0.0.1:8000/health
-```
-Expected response:
-```json
-{ "status": "ok", "service": "digital-wallet-api" }
-```
-
-### Test Credentials
+## Test Credentials
 
 | Role | Credential | Value |
 |------|-----------|-------|
@@ -295,160 +361,222 @@ Expected response:
 
 ---
 
-## Database
+## Anomaly Detection Engine
 
-The system uses **SQLite** with **SQLAlchemy ORM** for persistent storage across two separate databases.
+The proxy integrates a trained **Isolation Forest** model that scores every session in real time based on 15 behavioral features.
 
-### Database Files
+### Detection Thresholds
 
-Both databases are auto-created in the project root on first startup:
+| Threshold | Value | Justification |
+|-----------|-------|---------------|
+| `MIN_REQUESTS_BEFORE_SCORING` | 3 | Training data minimum — scoring below this has no comparable data |
+| `ANOMALY_SCORE_THRESHOLD` | -0.013 | mean(0.077) − 2×std(0.045) — covers 95% of legitimate sessions |
+
+### Session Identity Priority
+1. `X-User-Token` header → `user:<token>`
+2. `X-Admin-Token` header → `admin:<token>`
+3. Client IP fallback → `ip:<address>`
+
+### Routing Logic
+- **Normal session** → forwarded to real backend (:8000)
+- **Flagged session** → silently redirected to decoy (:8001)
+- **Sticky flag** → once flagged, all future requests go to decoy permanently
+
+### Token Mirroring
+When a session is flagged, the proxy copies the attacker's real session token into `decoy_wallet.db` so the decoy recognizes it seamlessly — the attacker notices no disruption.
+
+---
+
+## Decoy API
+
+The decoy is a stateful FastAPI application that mirrors the real backend.
+
+### Key Design Decisions
+- **Stateful** — `decoy_wallet.db` maintains real balance state across requests
+- **Realistic auth** — only accepts valid credentials, rejects invalid ones with identical error messages
+- **No X-From-Proxy validation** — captures all traffic including direct hits
+- **Full logging** — every attacker interaction logged to `proxy_logs.db`
+
+### Seeded Data
+On startup, the decoy is pre-populated with believable data:
+- 3 users with realistic Saudi names and cities
+- 3 wallets with realistic SAR balances
+- 5 past transactions (topups, transfers, bill payments)
+- 3 bank accounts linked to Saudi banks
+- 3 payment records
+
+---
+
+## Database Architecture
+
+The system uses **SQLite** as its database engine, managed via **SQLAlchemy ORM**. There are three separate database files, each with a distinct purpose:
+
+| Database | Purpose |
+|----------|---------|
+| `digital_wallet.db` | Real backend customer data (users, wallets, transactions, audit logs) |
+| `decoy_wallet.db` | Decoy fake wallet state (mirrors real backend schema with fake data) |
+| `proxy_logs.db` | Unified log database (proxy routing decisions + decoy attacker interactions) |
+
+### Unified Log Database
+
+`proxy_logs.db` contains two tables that can be correlated by `session_id` to reconstruct a full attack timeline:
+
 ```
-digital_wallet.db       ← Customer backend API data
-proxy_logs.db          ← GATE80 proxy traffic logs
+proxy_logs.db
+  ├── proxy_requests    ← routing decisions, anomaly scores, session tracking
+  └── decoy_requests    ← attacker behavior inside the decoy
 ```
 
-### 1. Backend API Database (`digital_wallet.db`)
-Customer application data - managed by the backend API.
+Both `proxy_requests` and `decoy_requests` share `session_id` for full attack timeline correlation:
 
-| Table | Description |
-|-------|-------------|
-| `users` | Registered user accounts |
-| `wallets` | User wallets with balances |
-| `transactions` | All wallet transactions |
-| `payments` | Payment records |
-| `bank_accounts` | Linked bank accounts |
-| `user_sessions` | Active user session tokens |
-| `admin_sessions` | Active admin session tokens |
-| `admins` | Admin accounts |
-| `audit_logs` | Audit trail of backend operations |
+```sql
+SELECT p.session_id, p.anomaly_score, p.routed_to, d.path, d.response_status
+FROM proxy_requests p
+JOIN decoy_requests d ON p.session_id = d.session_id
+WHERE p.routed_to = 'decoy';
+```
 
-### 2. Proxy Logs Database (`proxy_logs.db`)
-GATE80 system logs - captures all HTTP traffic through the proxy for anomaly detection and security monitoring.
+### proxy_logs.db — proxy_requests Schema
 
-| Table | Description |
-|-------|-------------|
-| `proxy_requests` | Complete log of all HTTP requests passing through the reverse proxy |
+| Field | Type | Description |
+|-------|------|-------------|
+| `request_id` | String | Unique UUID per request |
+| `timestamp` | DateTime | When request was received |
+| `client_ip` | String | Client IP (supports X-Forwarded-For) |
+| `session_id` | String | Session identity (token or IP) |
+| `method` | String | HTTP method |
+| `path` | String | Request URL path |
+| `headers` | JSON | Request headers (tokens redacted) |
+| `body` | Text | Request body (max 10KB) |
+| `response_status` | Integer | HTTP response status code |
+| `response_time_ms` | Integer | Response time in milliseconds |
+| `anomaly_score` | Float | Raw Isolation Forest score |
+| `routed_to` | String | `backend` / `decoy` / `error` |
+| `flagged_as_suspicious` | Boolean | Whether session was flagged |
 
-**Schema - All Logged Fields:**
+### proxy_logs.db — decoy_requests Schema
 
-| Field | Type | Description | Example |
-|-------|------|-------------|---------|
-| `id` | Integer | Auto-incrementing primary key | `1`, `2`, `3` |
-| `request_id` | String | Unique UUID for each request | `a1b2c3d4-e5f6-...` |
-| `timestamp` | DateTime | When request was received | `2026-02-17 10:30:45` |
-| `client_ip` | String | Client IP address (supports X-Forwarded-For) | `192.168.1.100` |
-| `method` | String | HTTP method | `GET`, `POST`, `PUT`, `DELETE` |
-| `path` | String | Request URL path | `/api/v1/auth/sign-in` |
-| `query_params` | JSON | URL query parameters | `{"limit": 10, "offset": 0}` |
-| `headers` | JSON | Request headers (auth tokens redacted) | `{"user-agent": "...", "x-user-token": "***REDACTED***"}` |
-| `body` | Text | Request body (max 10KB) | `{"email": "user@example.com"}` |
-| `response_status` | Integer | HTTP response status code | `200`, `403`, `500` |
-| `response_time_ms` | Integer | Response time in milliseconds | `45`, `1203` |
-| `forwarded_to_backend` | Boolean | Whether request was forwarded to backend | `true`, `false` |
-| `backend_error` | String | Error message if backend unreachable | `"Backend unavailable"`, `"Timeout"` |
-| `flagged_as_suspicious` | Boolean | Marked as suspicious by detection engine | `false` *(future use)* |
-| `suspicion_reason` | String | Reason for flagging | `null` *(future use)* |
-| `created_at` | DateTime | Database record creation timestamp | `2026-02-17 10:30:45` |
+| Field | Type | Description |
+|-------|------|-------------|
+| `request_id` | String | Unique UUID per request |
+| `session_id` | String | Matches proxy_requests.session_id |
+| `method` | String | HTTP method |
+| `path` | String | Endpoint the attacker hit |
+| `body` | Text | Attacker's payload |
+| `response_status` | Integer | What the decoy returned |
+| `response_body` | Text | Decoy's response |
+| `response_time_ms` | Integer | Response time |
 
-**Note:** Fields marked for future use (suspicious flags) currently have default values and will be populated when the anomaly detection engine is integrated.
+---
 
-**Security Features:**
-- Authentication tokens are automatically redacted (`***REDACTED***`)
-- Request body size limited to 10KB to prevent database bloat
-- All timestamps use UTC timezone
+## Dataset Pipeline
 
+Used to generate training data for the Isolation Forest model.
 
-### Viewing the Databases
-
-**SQLite CLI:**
+### Normal Traffic (for model training)
 ```bash
-# Backend database
-sqlite3 digital_wallet.db
-.mode column
-.headers on
-SELECT * FROM users;
-SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 10;
-.quit
-
-# Proxy logs
-sqlite3 proxy_logs.db
-SELECT * FROM proxy_requests ORDER BY timestamp DESC LIMIT 10;
-.quit
+python dataset/generate_normal_traffic.py   # generates dataset/output/traffic_log.csv
+python dataset/feature_engineering.py       # generates dataset/output/baseline_sessions.csv
+python model/isolation.py                   # trains and saves model/isolation_forest.pkl
 ```
 
-**VS Code:** Install the **SQLite Viewer** extension by Florian Klampfer, then click the `.db` files in the file explorer.
+### Abnormal Traffic (for model testing)
+```bash
+python dataset/generate_mixed_traffic.py    # generates dataset/output/mixed_traffic_log.csv
+python dataset/abnormal/build_Abnormal_sessions.py
+python dataset/abnormal/feature_engineering_abnormal.py
+```
 
-### Audit Logging
+---
 
-#### **Backend Audit Logs** (`digital_wallet.db` → `audit_logs` table)
+## DB Migration Management
 
-Tracks all state-changing operations within the customer API:
+The project uses **Alembic** for schema version management.
 
-| Category | Events Logged |
-|----------|--------------|
-| Authentication | User/admin login, logout, failed login attempts |
-| Wallet Operations | Top up, withdraw, user-to-user transfer, bill payment |
-| Account Changes | Profile updates, bank account addition/modification |
-| Admin Actions | Admin viewing users, wallets, transactions |
-| Failures | Insufficient balance, invalid credentials, unauthorized access |
+```bash
+# Apply all pending migrations
+alembic upgrade head
 
+# Roll back one migration
+alembic downgrade -1
+
+# Generate a new migration after changing models.py
+alembic revision --autogenerate -m "describe your change"
+```
 
 ---
 
 ## Elastic Stack Monitoring Setup
 
-The GATE80 system uses the **Elastic Stack (Elasticsearch, Logstash, and Kibana)** to monitor and analyze API traffic generated by the reverse proxy.
+The GATE80 system uses the **Elastic Stack** to monitor and visualize API traffic and attacker behavior.
 
-The monitoring layer enables:
-
-- Real-time log collection
-- Security monitoring
-- API traffic analysis
-- Detection of suspicious activity
-
-All API traffic passing through the proxy is stored in the **proxy_logs.db** database and then processed by Logstash before being indexed in Elasticsearch and visualized in Kibana.
-
----
-
-## Elastic Stack Components
-
-The Elastic Stack consists of three main tools:
+### Components
 
 | Component | Purpose |
 |----------|---------|
 | Elasticsearch | Stores and indexes logs |
-| Logstash | Collects and processes logs |
-| Kibana | Visualizes logs and dashboards |
+| Logstash | Extracts from proxy_logs.db and indexes into Elasticsearch |
+| Kibana | Visualizes traffic, anomaly scores, and decoy interactions |
 
----
+### Prerequisites
 
-## Installing Elasticsearch
+- Java 11+ (required by Elasticsearch and Logstash)
+- At least 4GB RAM available
 
-Elasticsearch is responsible for storing and indexing logs.
+### Install
 
-### Install Elasticsearch (macOS)
-
+**macOS (Homebrew)**
 ```bash
 brew tap elastic/tap
 brew install elastic/tap/elasticsearch-full
+brew install elastic/tap/logstash-full
+brew install elastic/tap/kibana-full
 ```
 
-### Start Elasticsearch
+**Linux (apt)**
+```bash
+wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
+sudo apt-get install elasticsearch logstash kibana
+```
 
+**Windows / All Platforms**
+
+Download directly from the official site:
+```
+https://www.elastic.co/downloads/
+```
+
+### Start
+
+**macOS**
 ```bash
 brew services start elastic/tap/elasticsearch-full
+brew services start elastic/tap/kibana-full
+logstash -f logstash/pipeline.conf
 ```
 
-### Verify Elasticsearch Installation
+**Linux**
+```bash
+sudo systemctl start elasticsearch
+sudo systemctl start kibana
+logstash -f logstash/pipeline.conf
+```
 
-Open in the browser:
+**Windows**
+```bash
+# Run from Elasticsearch/Logstash/Kibana installation directories
+bin\elasticsearch.bat
+bin\kibana.bat
+bin\logstash.bat -f logstash/pipeline.conf
+```
 
+### Verify Installation
+
+**Elasticsearch:**
 ```
 http://localhost:9200
 ```
-
 Expected response:
-
 ```json
 {
   "name": "localhost",
@@ -456,89 +584,31 @@ Expected response:
 }
 ```
 
----
-
-## Installing Logstash
-
-Logstash is responsible for extracting logs from the proxy database and sending them to Elasticsearch.
-
-### Install Logstash
-
-```bash
-brew install elastic/tap/logstash-full
-```
-
-### Create Logstash Pipeline
-
-make sure you pulled the Pipeline file:
-
-```
-logstash/pipeline.conf
-
-```
-
-### Run Logstash
-
-```bash
-logstash -f logstash/pipeline.conf
-```
-
-Logstash will read logs from the proxy database and send them to Elasticsearch.
-
----
-
-## Installing Kibana
-
-Kibana is used to visualize and analyze logs stored in Elasticsearch.
-
-### Install Kibana
-
-```bash
-brew install elastic/tap/kibana-full
-```
-
-### Start Kibana
-
-```bash
-brew services start elastic/tap/kibana-full
-```
-
-### Open Kibana
-
-Open the following URL in your browser:
-
+**Kibana:**
 ```
 http://localhost:5601
 ```
 
----
+### Creating a Kibana Index Pattern
 
-## Creating a Kibana Index Pattern
+1. Open Kibana at `http://localhost:5601`
+2. Navigate to **Stack Management → Index Patterns**
+3. Click **Create Index Pattern**
+4. Create two index patterns:
 
-1. Open Kibana  
-2. Navigate to:
+| Index Pattern | Description |
+|--------------|-------------|
+| `gate80-proxy-logs` | Proxy routing decisions and anomaly scores |
+| `gate80-decoy-logs` | Attacker behavior inside the decoy |
 
-```
-Stack Management → Index Patterns
-```
+### Index Names
 
-3. Click:
+| Index | Source Table | Content |
+|-------|-------------|---------|
+| `gate80-proxy-logs` | `proxy_requests` | Routing decisions, anomaly scores |
+| `gate80-decoy-logs` | `decoy_requests` | Attacker behavior in decoy |
 
-```
-Create Index Pattern
-```
-
-4. Enter the index name:
-
-```
-gate80-api-logs
-```
-
----
-
-## Monitoring Architecture
-
-The monitoring pipeline in this project works as follows:
+### Monitoring Architecture
 
 ```
 Client Request
@@ -547,7 +617,7 @@ Client Request
 Reverse Proxy
       │
       ▼
-proxy_logs.db
+proxy_logs.db (proxy_requests + decoy_requests)
       │
       ▼
 Logstash
@@ -567,35 +637,11 @@ Kibana Dashboard
 
 ---
 
-## Benefits of Using the Elastic Stack
-
-Using Elasticsearch, Logstash, and Kibana provides several advantages for the GATE80 system:
-
-- Real-time monitoring of API traffic
-- Detection of suspicious activity
-- Visualization of system behavior
-- Analysis of response times and errors
-- Investigation of potential attacks
-
-This monitoring layer improves the **security visibility and detection capabilities** of the GATE80 platform.
-
----
-
----
-
-## API Reference
-
-Interactive API documentation is available through Swagger UI at:
-```
-http://127.0.0.1:8080/docs
-```
----
-
 ## Authors
-- Rama Alguthmi  
-- Wed Alotaibi  
-- Taif Alsaadi  
-- Rahaf Lamphon  
+- Rama Alguthmi
+- Wed Alotaibi
+- Taif Alsaadi
+- Rahaf Lamphon
 
 ---
 
@@ -604,4 +650,5 @@ http://127.0.0.1:8080/docs
 ---
 
 ## Contact
+
 📧 Contact information will be added.
