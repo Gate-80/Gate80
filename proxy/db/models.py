@@ -8,8 +8,8 @@ from proxy.db.database import Base
 class ProxyRequest(Base):
     __tablename__ = "proxy_requests"
 
-    id           = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    request_id   = Column(String(50), unique=True, index=True, nullable=False)
+    id         = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    request_id = Column(String(50), unique=True, index=True, nullable=False)
 
     # Request details
     timestamp    = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
@@ -24,25 +24,30 @@ class ProxyRequest(Base):
     response_status  = Column(Integer, index=True)
     response_time_ms = Column(Integer)
 
-    # Routing (original)
+    # Routing
     forwarded_to_backend = Column(Boolean, default=True)
     backend_error        = Column(String(200))
 
-    # Week 6 — detection & adaptive routing
+    # Detection & adaptive routing
     session_id    = Column(String(200), index=True, nullable=True)
-    anomaly_score = Column(Float, nullable=True)
+    anomaly_score = Column(Float,       nullable=True)
     routed_to     = Column(String(20),  default="backend", nullable=False, index=True)
 
-    # Legacy detection flags
-    flagged_as_suspicious = Column(Boolean, default=False, index=True)
+    # Detection flags
+    flagged_as_suspicious = Column(Boolean,     default=False, index=True)
     suspicion_reason      = Column(String(200))
+
+    # Adaptive deception — behavior classification
+    # Values: brute_force | scanning | fraud | unknown_suspicious | NULL
+    # NULL means session was never flagged (normal traffic)
+    attack_type = Column(String(50), nullable=True, index=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     def __repr__(self) -> str:
         return (
             f"<ProxyRequest {self.request_id} {self.method} {self.path} "
-            f"-> {self.response_status} [{self.routed_to}]>"
+            f"-> {self.response_status} [{self.routed_to}] attack={self.attack_type}>"
         )
 
     @staticmethod

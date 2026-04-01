@@ -1,16 +1,14 @@
-
 import json
 import logging
 from typing import Optional
 from fastapi import Request
 from sqlalchemy.orm import Session
-
 from proxy.db.models import ProxyRequest
 
 logger = logging.getLogger("proxy.logger")
 
 _REDACT_HEADERS = {"x-user-token", "x-admin-token", "authorization", "cookie"}
-_MAX_BODY_BYTES = 10_240  # 10 KB
+_MAX_BODY_BYTES  = 10_240  # 10 KB
 
 
 def _redact_headers(headers: dict) -> dict:
@@ -45,8 +43,9 @@ def log_request(
     routed_to: str = "backend",
     flagged_as_suspicious: bool = False,
     suspicion_reason: Optional[str] = None,
+    attack_type: Optional[str] = None,
 ) -> None:
-    # Log a proxy request to the database.
+    """Log a proxy request to the database."""
     try:
         record = ProxyRequest(
             request_id=request_id,
@@ -65,10 +64,10 @@ def log_request(
             routed_to=routed_to,
             flagged_as_suspicious=flagged_as_suspicious,
             suspicion_reason=suspicion_reason,
+            attack_type=attack_type,
         )
         db.add(record)
         db.commit()
-
     except Exception as exc:
         logger.error("Failed to log proxy request %s: %s", request_id, exc)
         db.rollback()
@@ -90,6 +89,7 @@ def db_log(
     routed_to: str = "backend",
     flagged_as_suspicious: bool = False,
     suspicion_reason: Optional[str] = None,
+    attack_type: Optional[str] = None,
 ) -> None:
     """
     Convenience wrapper around log_request() used by the proxy handler.
@@ -115,4 +115,5 @@ def db_log(
         routed_to=routed_to,
         flagged_as_suspicious=flagged_as_suspicious,
         suspicion_reason=suspicion_reason,
+        attack_type=attack_type,
     )

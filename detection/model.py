@@ -1,26 +1,15 @@
-
 import math
 import time
-from turtle import pd
 import pandas as pd
 import joblib
 import logging
 import threading
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Tuple
-
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Detection thresholds
-# Derived from baseline_sessions.csv (426 normal sessions):
-#   - MIN_REQUESTS: model was trained on sessions with min=3 requests,
-#     scoring below this has no comparable training data
-#   - SCORE_THRESHOLD: mean(0.077) - 2*std(0.045) = -0.013
-#     covers 95% of normal sessions, reduces false positives
-# ─────────────────────────────────────────────────────────────────────────────
 MIN_REQUESTS_BEFORE_SCORING = 3
 ANOMALY_SCORE_THRESHOLD = -0.013
 
@@ -28,7 +17,9 @@ FEATURE_NAMES = [
     "total_requests",
     "session_duration_sec",
     "requests_per_minute",
+    "requests_per_second",
     "error_ratio",
+    "error_count",
     "unique_endpoints",
     "endpoint_entropy",
     "admin_action_count",
@@ -48,10 +39,8 @@ class SessionState:
     session_id: str
     created_at: float = field(default_factory=time.time)
     last_request_at: float = field(default_factory=time.time)
-
     total_requests: int = 0
     error_count: int = 0
-
     endpoint_counts: dict = field(default_factory=dict)
     admin_action_count: int = 0
     wallet_request_count: int = 0
@@ -59,24 +48,20 @@ class SessionState:
     topup_count: int = 0
     withdraw_count: int = 0
     pay_bill_count: int = 0
-
     think_times_ms: list = field(default_factory=list)
     response_times_ms: list = field(default_factory=list)
-
     is_anomalous: bool = False
     anomaly_score: float = 0.0
     flagged_at: Optional[float] = None
 
 
 class AnomalyDetector:
-
     def __init__(self, model_path: str, scaler_path: str):
         self._lock = threading.Lock()
         self._sessions: Dict[str, SessionState] = {}
 
         logger.info("GATE80 ▶ loading model  : %s", model_path)
         self.model = joblib.load(model_path)
-
         logger.info("GATE80 ▶ loading scaler : %s", scaler_path)
         self.scaler = joblib.load(scaler_path)
 
@@ -90,8 +75,6 @@ class AnomalyDetector:
             MIN_REQUESTS_BEFORE_SCORING,
             ANOMALY_SCORE_THRESHOLD,
         )
-
-    # ── Session lifecycle ─────────────────────────────────────────────────────
 
     def get_or_create_session(self, session_id: str) -> SessionState:
         with self._lock:
@@ -109,8 +92,6 @@ class AnomalyDetector:
         with self._lock:
             return len(self._sessions)
 
-    # ── Feature update ────────────────────────────────────────────────────────
-
     def update_session(
         self,
         session_id: str,
@@ -125,11 +106,9 @@ class AnomalyDetector:
                 self._sessions[session_id] = s
 
             now = time.time()
-
             if s.total_requests > 0:
                 think_ms = (now - s.last_request_at) * 1000.0
                 s.think_times_ms.append(think_ms)
-
             s.last_request_at = now
             s.total_requests += 1
 
@@ -141,32 +120,20 @@ class AnomalyDetector:
             clean_path = _normalise_path(path)
             s.endpoint_counts[clean_path] = s.endpoint_counts.get(clean_path, 0) + 1
 
-            if _is_admin(path):
-                s.admin_action_count += 1
-            if _is_wallet(path):
-                s.wallet_request_count += 1
-            if _is_transfer(path):
-                s.transfer_count += 1
-            if _is_topup(path):
-                s.topup_count += 1
-            if _is_withdraw(path):
-                s.withdraw_count += 1
-            if _is_pay_bill(path):
-                s.pay_bill_count += 1
-
-    # ── Scoring ───────────────────────────────────────────────────────────────
+            if _is_admin(path):    s.admin_action_count += 1
+            if _is_wallet(path):   s.wallet_request_count += 1
+            if _is_transfer(path): s.transfer_count += 1
+            if _is_topup(path):    s.topup_count += 1
+            if _is_withdraw(path): s.withdraw_count += 1
+            if _is_pay_bill(path): s.pay_bill_count += 1
 
     def score_session(self, session_id: str) -> Tuple[bool, float]:
         with self._lock:
             s = self._sessions.get(session_id)
             if s is None:
                 return False, 0.0
-
-            # Sticky flag — once anomalous always anomalous
             if s.is_anomalous:
                 return True, s.anomaly_score
-
-            # Not enough requests yet — don't score
             if s.total_requests < MIN_REQUESTS_BEFORE_SCORING:
                 logger.debug(
                     "GATE80 ⏳ session %s has %d requests — waiting for %d",
@@ -175,14 +142,10 @@ class AnomalyDetector:
                 return False, 0.0
 
             vec = _build_feature_vector(s)
-
-        x = pd.DataFrame([vec], columns=FEATURE_NAMES)
-        x_scaled = self.scaler.transform(x)
-
-        raw_score = float(self.model.decision_function(x_scaled)[0])
-
-        # Apply score threshold — stricter than default 0 cutoff
-        is_anomalous = raw_score < ANOMALY_SCORE_THRESHOLD
+            x = pd.DataFrame([vec], columns=FEATURE_NAMES)
+            x_scaled = self.scaler.transform(x)
+            raw_score = float(self.model.decision_function(x_scaled)[0])
+            is_anomalous = raw_score < ANOMALY_SCORE_THRESHOLD
 
         with self._lock:
             s = self._sessions.get(session_id)
@@ -193,14 +156,10 @@ class AnomalyDetector:
                     s.flagged_at = time.time()
                     logger.warning(
                         "GATE80 🚨 anomalous session flagged: %s  (score=%.4f, threshold=%.3f)",
-                        session_id,
-                        raw_score,
-                        ANOMALY_SCORE_THRESHOLD,
+                        session_id, raw_score, ANOMALY_SCORE_THRESHOLD,
                     )
 
         return is_anomalous, raw_score
-
-    # ── Update + score in one call ────────────────────────────────────────────
 
     def process_request(
         self,
@@ -213,10 +172,6 @@ class AnomalyDetector:
         return self.score_session(session_id)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _normalise_path(path: str) -> str:
     import re
     path = re.sub(r"/[a-zA-Z]{1,4}_\d{4,}", "/{id}", path)
@@ -224,23 +179,12 @@ def _normalise_path(path: str) -> str:
     return path.rstrip("/") or "/"
 
 
-def _is_admin(path: str) -> bool:
-    return "/admin" in path
-
-def _is_wallet(path: str) -> bool:
-    return "/wallet" in path
-
-def _is_transfer(path: str) -> bool:
-    return "transfer" in path
-
-def _is_topup(path: str) -> bool:
-    return "topup" in path
-
-def _is_withdraw(path: str) -> bool:
-    return "withdraw" in path
-
-def _is_pay_bill(path: str) -> bool:
-    return "pay-bill" in path
+def _is_admin(path: str) -> bool:    return "/admin" in path
+def _is_wallet(path: str) -> bool:   return "/wallet" in path
+def _is_transfer(path: str) -> bool: return "transfer" in path
+def _is_topup(path: str) -> bool:    return "topup" in path
+def _is_withdraw(path: str) -> bool: return "withdraw" in path
+def _is_pay_bill(path: str) -> bool: return "pay-bill" in path
 
 
 def _shannon_entropy(counts: dict) -> float:
@@ -256,17 +200,18 @@ def _shannon_entropy(counts: dict) -> float:
 
 
 def _build_feature_vector(s: SessionState) -> list:
-    now = time.time()
+    now          = time.time()
     duration_sec = max(now - s.created_at, 1e-6)
-
-    think_times = s.think_times_ms
-    resp_times  = s.response_times_ms
+    think_times  = s.think_times_ms
+    resp_times   = s.response_times_ms
 
     return [
         s.total_requests,
         duration_sec,
-        (s.total_requests / duration_sec) * 60.0,
-        s.error_count / max(s.total_requests, 1),
+        (s.total_requests / duration_sec) * 60.0,      # requests_per_minute
+        s.total_requests / duration_sec,                # requests_per_second
+        s.error_count / max(s.total_requests, 1),       # error_ratio
+        float(s.error_count),                           # error_count
         len(s.endpoint_counts),
         _shannon_entropy(s.endpoint_counts),
         s.admin_action_count,
