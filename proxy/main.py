@@ -1,3 +1,20 @@
+"""
+GATE80 — Reverse Proxy
+proxy/main.py
+
+Intercepts all traffic, scores sessions with Isolation Forest,
+classifies attack behavior using a two-layer sliding window model,
+and routes suspicious sessions to the stateful decoy API.
+
+Two-layer classification:
+  Layer 1 (window, 60% weight)  — recent behavior, full after 6 requests
+  Layer 2 (cumulative, 40% weight) — lifetime evidence with decay
+
+At flag time: classification runs immediately using cumulative layer
+(window may not be full yet). As window fills, window layer adds weight.
+This handles both fast attacks (window-dominant) and slow multi-phase
+attacks like scanning (cumulative-dominant).
+"""
 
 import os
 import time
@@ -12,6 +29,9 @@ from sqlalchemy.orm import sessionmaker
 from proxy.db.database import SessionLocal, init_db
 from proxy.db.logger import db_log
 from detection.model import AnomalyDetector
+from proxy.behaviour_class import (
+    SessionWindow, RequestSignal, classify_behavior, BEHAVIOR_WINDOW_SIZE
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Logging
@@ -31,7 +51,6 @@ DECOY_URL    = os.getenv("DECOY_URL",    "http://127.0.0.1:8001")
 MODEL_PATH   = os.getenv("MODEL_PATH",   "model/isolation_forest.pkl")
 SCALER_PATH  = os.getenv("SCALER_PATH",  "model/scaler.pkl")
 
-# Paths to both databases for token mirroring
 BACKEND_DB_PATH = os.getenv("BACKEND_DB_PATH", "digital_wallet.db")
 DECOY_DB_PATH   = os.getenv("DECOY_DB_PATH",   "decoy_wallet.db")
 
@@ -54,9 +73,17 @@ app = FastAPI(
 http_client = httpx.AsyncClient(timeout=30.0)
 detector: AnomalyDetector | None = None
 
-# Separate DB sessions for token mirroring
 _backend_session_factory = None
 _decoy_session_factory   = None
+
+# Sliding windows tracked for ALL sessions — built before flagging
+session_windows: dict[str, SessionWindow] = {}
+
+
+def get_or_create_window(sid: str) -> SessionWindow:
+    if sid not in session_windows:
+        session_windows[sid] = SessionWindow()
+    return session_windows[sid]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -77,20 +104,32 @@ def startup_event():
             MODEL_PATH, SCALER_PATH,
         )
 
-    # Set up direct DB connections for token mirroring
     if os.path.exists(BACKEND_DB_PATH):
-        engine = create_engine(f"sqlite:///{BACKEND_DB_PATH}", connect_args={"check_same_thread": False})
+        engine = create_engine(
+            f"sqlite:///{BACKEND_DB_PATH}",
+            connect_args={"check_same_thread": False}
+        )
         _backend_session_factory = sessionmaker(bind=engine)
         logger.info("✅ Backend DB connected for token mirroring")
     else:
         logger.warning("⚠️  Backend DB not found — token mirroring disabled")
 
     if os.path.exists(DECOY_DB_PATH):
-        engine = create_engine(f"sqlite:///{DECOY_DB_PATH}", connect_args={"check_same_thread": False})
+        engine = create_engine(
+            f"sqlite:///{DECOY_DB_PATH}",
+            connect_args={"check_same_thread": False}
+        )
         _decoy_session_factory = sessionmaker(bind=engine)
         logger.info("✅ Decoy DB connected for token mirroring")
     else:
         logger.warning("⚠️  Decoy DB not found — token mirroring disabled")
+
+    logger.info(
+        "✅ Adaptive deception ready — window_size=%d, decay=%.2f, "
+        "behavior_classes=%s",
+        BEHAVIOR_WINDOW_SIZE, 0.85,
+        ["brute_force", "scanning", "fraud", "unknown_suspicious"],
+    )
 
 
 @app.on_event("shutdown")
@@ -102,16 +141,10 @@ async def shutdown_event():
 # Token mirroring
 # ─────────────────────────────────────────────────────────────────────────────
 def mirror_token_to_decoy(token: str) -> None:
-    """
-    When a session is flagged, copy the real token and its user_id
-    into decoy_wallet.db so the attacker's subsequent requests are
-    recognized by the decoy without any disruption.
-    """
     if not _backend_session_factory or not _decoy_session_factory:
         return
 
     try:
-        # Look up the token in the real backend DB
         backend_db = _backend_session_factory()
         row = backend_db.execute(
             text("SELECT user_id FROM user_sessions WHERE token = :token"),
@@ -125,7 +158,6 @@ def mirror_token_to_decoy(token: str) -> None:
 
         user_id = row[0]
 
-        # Look up the user in the real backend DB
         backend_db = _backend_session_factory()
         user = backend_db.execute(
             text("SELECT id, full_name, email, phone, city, is_verified FROM users WHERE id = :uid"),
@@ -135,7 +167,6 @@ def mirror_token_to_decoy(token: str) -> None:
 
         decoy_db = _decoy_session_factory()
 
-        # Insert user into decoy DB if not already there
         existing_user = decoy_db.execute(
             text("SELECT id FROM users WHERE id = :uid"),
             {"uid": user_id}
@@ -143,7 +174,10 @@ def mirror_token_to_decoy(token: str) -> None:
 
         if not existing_user and user:
             decoy_db.execute(
-                text("INSERT INTO users (id, full_name, email, password, phone, city, is_verified) VALUES (:id, :full_name, :email, :password, :phone, :city, :is_verified)"),
+                text(
+                    "INSERT INTO users (id, full_name, email, password, phone, city, is_verified) "
+                    "VALUES (:id, :full_name, :email, :password, :phone, :city, :is_verified)"
+                ),
                 {
                     "id":          user[0],
                     "full_name":   user[1],
@@ -155,7 +189,6 @@ def mirror_token_to_decoy(token: str) -> None:
                 }
             )
 
-            # Create a wallet for the mirrored user if not exists
             existing_wallet = decoy_db.execute(
                 text("SELECT id FROM wallets WHERE user_id = :uid"),
                 {"uid": user_id}
@@ -163,11 +196,13 @@ def mirror_token_to_decoy(token: str) -> None:
 
             if not existing_wallet:
                 decoy_db.execute(
-                    text("INSERT INTO wallets (id, user_id, currency_code, balance, status) VALUES (:id, :user_id, 'SAR', '2500.00', 'ACTIVE')"),
+                    text(
+                        "INSERT INTO wallets (id, user_id, currency_code, balance, status) "
+                        "VALUES (:id, :user_id, 'SAR', '2500.00', 'ACTIVE')"
+                    ),
                     {"id": f"w_mirror_{user_id}", "user_id": user_id}
                 )
 
-        # Mirror the session token
         existing_token = decoy_db.execute(
             text("SELECT token FROM user_sessions WHERE token = :token"),
             {"token": token}
@@ -192,7 +227,7 @@ def mirror_token_to_decoy(token: str) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Helper functions
+# Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 def get_client_ip(request: Request) -> str:
     forwarded_for = request.headers.get("X-Forwarded-For")
@@ -211,24 +246,47 @@ def get_session_id(request: Request) -> str:
     return f"ip:{get_client_ip(request)}"
 
 
-def build_forward_headers(request: Request) -> dict:
+def build_forward_headers(request: Request, extra: dict | None = None) -> dict:
     headers = {
         k: v
         for k, v in request.headers.items()
         if k.lower() != "host" and k.lower() not in HOP_BY_HOP_HEADERS
     }
     headers["X-From-Proxy"] = "1"
+    if extra:
+        headers.update(extra)
     return headers
 
 
-async def forward(request: Request, body: bytes, target_url: str) -> httpx.Response:
+async def forward(
+    request: Request,
+    body: bytes,
+    target_url: str,
+    extra_headers: dict | None = None,
+) -> httpx.Response:
     return await http_client.request(
         method=request.method,
         url=target_url,
         params=request.query_params,
         content=body,
-        headers=build_forward_headers(request),
+        headers=build_forward_headers(request, extra_headers),
     )
+
+
+def _reclassify(window: SessionWindow, sid: str) -> None:
+    """
+    Reclassify using the two-layer model.
+    Cumulative layer is always active.
+    Window layer activates once window is full.
+    No minimum request count needed — cumulative provides early signal.
+    """
+    new_type = classify_behavior(window)
+    if new_type != window.attack_type:
+        logger.info(
+            "GATE80 🔄 [BEHAVIOR SHIFT] sid=%-40s %s → %s",
+            sid, window.attack_type, new_type,
+        )
+        window.attack_type = new_type
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -238,9 +296,7 @@ async def forward(request: Request, body: bytes, target_url: str) -> httpx.Respo
 async def log_requests(request: Request, call_next):
     req_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     start  = time.time()
-
     response = await call_next(request)
-
     ms = int((time.time() - start) * 1000)
     logger.info(
         "id=%s %s %s → %d  %dms",
@@ -267,17 +323,39 @@ async def reverse_proxy(request: Request, path: str):
     body_str = body.decode("utf-8", errors="ignore") if body else None
     db       = SessionLocal()
 
+    window = get_or_create_window(sid)
+    last_signal_time = window.requests[-1].timestamp if window.requests else start_time
+    think_time_ms = (start_time - last_signal_time) * 1000
+
     pre_flagged = False
     if detector is not None:
         state = detector.get_or_create_session(sid)
         pre_flagged = state.is_anomalous
 
     try:
+        # ─────────────────────────────────────────────────────────────────────
+        # Branch A: session already flagged → forward to decoy
+        # ─────────────────────────────────────────────────────────────────────
         if pre_flagged:
-            # ── Already flagged → send to decoy ──────────────────────────────
             try:
-                upstream = await forward(request, body, f"{DECOY_URL}/{path}")
+                # Reclassify on every decoy request — two-layer model
+                # handles both early (cumulative) and late (window) signals
+                _reclassify(window, sid)
+
+                upstream = await forward(
+                    request, body,
+                    f"{DECOY_URL}/{path}",
+                    extra_headers={"X-Attack-Type": window.attack_type},
+                )
                 response_time_ms = int((time.time() - start_time) * 1000)
+
+                # Add to window AFTER forwarding so status code is real
+                window.add(RequestSignal(
+                    timestamp=start_time,
+                    path=request.url.path,
+                    status_code=upstream.status_code,
+                    think_time_ms=think_time_ms,
+                ))
 
                 _, score = detector.process_request(
                     sid, request.url.path,
@@ -285,8 +363,10 @@ async def reverse_proxy(request: Request, path: str):
                 )
 
                 logger.info(
-                    "GATE80 🔀 [DECOY]   sid=%-40s score=%.4f  %s %s → %d",
-                    sid, score, request.method, request.url.path, upstream.status_code,
+                    "GATE80 🔀 [DECOY]   sid=%-40s score=%.4f  "
+                    "attack_type=%-20s  %s %s → %d",
+                    sid, score, window.attack_type,
+                    request.method, request.url.path, upstream.status_code,
                 )
 
                 db_log(
@@ -298,6 +378,7 @@ async def reverse_proxy(request: Request, path: str):
                     routed_to="decoy",
                     flagged_as_suspicious=True,
                     suspicion_reason=f"IF score={score:.4f}",
+                    attack_type=window.attack_type,
                 )
 
                 return Response(
@@ -308,7 +389,11 @@ async def reverse_proxy(request: Request, path: str):
 
             except (httpx.ConnectError, httpx.TimeoutException) as exc:
                 response_time_ms = int((time.time() - start_time) * 1000)
-                error_msg = "Decoy unavailable" if isinstance(exc, httpx.ConnectError) else "Decoy timeout"
+                error_msg = (
+                    "Decoy unavailable"
+                    if isinstance(exc, httpx.ConnectError)
+                    else "Decoy timeout"
+                )
                 logger.warning("GATE80 ⚠️  decoy unreachable: %s", exc)
 
                 db_log(
@@ -318,6 +403,7 @@ async def reverse_proxy(request: Request, path: str):
                     backend_error=error_msg,
                     session_id=sid,
                     routed_to="error",
+                    attack_type=window.attack_type,
                 )
 
                 return Response(
@@ -326,11 +412,21 @@ async def reverse_proxy(request: Request, path: str):
                     headers={"Content-Type": "application/json"},
                 )
 
+        # ─────────────────────────────────────────────────────────────────────
+        # Branch B: normal session → forward to real backend
+        # ─────────────────────────────────────────────────────────────────────
         else:
-            # ── Normal session → send to real backend ─────────────────────────
             try:
                 upstream = await forward(request, body, f"{BACKEND_URL}/{path}")
                 response_time_ms = int((time.time() - start_time) * 1000)
+
+                # Add to window with real status code
+                window.add(RequestSignal(
+                    timestamp=start_time,
+                    path=request.url.path,
+                    status_code=upstream.status_code,
+                    think_time_ms=think_time_ms,
+                ))
 
                 if detector is not None:
                     is_anomalous, score = detector.process_request(
@@ -340,19 +436,27 @@ async def reverse_proxy(request: Request, path: str):
                 else:
                     is_anomalous, score = False, 0.0
 
-                # ── Mirror token to decoy when first flagged ──────────────────
+                attack_type = None
+
                 if is_anomalous:
+                    # Classify immediately — cumulative layer has been
+                    # accumulating evidence since the first request
+                    attack_type = classify_behavior(window)
+                    window.attack_type = attack_type
+
                     token = request.headers.get("X-User-Token")
                     if token:
                         mirror_token_to_decoy(token)
+
                     logger.warning(
-                        "GATE80 🚨 [FLAGGED] sid=%-40s score=%.4f "
-                        "→ next requests → decoy",
-                        sid, score,
+                        "GATE80 🚨 [FLAGGED]  sid=%-40s score=%.4f  "
+                        "attack_type=%s  → next requests → decoy",
+                        sid, score, attack_type,
                     )
                 else:
                     logger.info(
-                        "GATE80 ✅ [BACKEND] sid=%-40s score=%.4f  %s %s → %d",
+                        "GATE80 ✅ [BACKEND]  sid=%-40s score=%.4f  "
+                        "%s %s → %d",
                         sid, score, request.method,
                         request.url.path, upstream.status_code,
                     )
@@ -366,6 +470,7 @@ async def reverse_proxy(request: Request, path: str):
                     routed_to="backend",
                     flagged_as_suspicious=is_anomalous,
                     suspicion_reason=f"IF score={score:.4f}" if is_anomalous else None,
+                    attack_type=attack_type,
                 )
 
                 return Response(
