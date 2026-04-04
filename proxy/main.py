@@ -14,6 +14,14 @@ At flag time: classification runs immediately using cumulative layer
 (window may not be full yet). As window fills, window layer adds weight.
 This handles both fast attacks (window-dominant) and slow multi-phase
 attacks like scanning (cumulative-dominant).
+
+Dataset generation mode:
+  Set GATE80_DETECTION_DISABLED=1 to disable anomaly detection entirely.
+  All traffic is forwarded to the real backend. No sessions are flagged.
+  Use this when running the unified traffic generator to prevent the
+  detection engine from contaminating normal session feature values.
+
+  Run:  GATE80_DETECTION_DISABLED=1 uvicorn proxy.main:app --reload --port 8080
 """
 
 import os
@@ -53,6 +61,13 @@ SCALER_PATH  = os.getenv("SCALER_PATH",  "model/scaler.pkl")
 
 BACKEND_DB_PATH = os.getenv("BACKEND_DB_PATH", "digital_wallet.db")
 DECOY_DB_PATH   = os.getenv("DECOY_DB_PATH",   "decoy_wallet.db")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dataset generation mode — disables anomaly detection entirely.
+# All traffic is forwarded directly to the real backend.
+# Set env var: GATE80_DETECTION_DISABLED=1
+# ─────────────────────────────────────────────────────────────────────────────
+DETECTION_DISABLED = os.getenv("GATE80_DETECTION_DISABLED", "0") == "1"
 
 HOP_BY_HOP_HEADERS = {
     "connection", "keep-alive", "proxy-authenticate",
@@ -96,13 +111,20 @@ def startup_event():
     init_db()
     logger.info("✅ Proxy database initialised")
 
-    if os.path.exists(MODEL_PATH) and os.path.exists(SCALER_PATH):
-        detector = AnomalyDetector(MODEL_PATH, SCALER_PATH)
-    else:
+    if DETECTION_DISABLED:
         logger.warning(
-            "⚠️  Model files not found (%s, %s) — detection disabled.",
-            MODEL_PATH, SCALER_PATH,
+            "⚠️  GATE80_DETECTION_DISABLED=1 — detection is OFF. "
+            "All traffic forwarded to real backend. "
+            "Use this mode for dataset generation only."
         )
+    else:
+        if os.path.exists(MODEL_PATH) and os.path.exists(SCALER_PATH):
+            detector = AnomalyDetector(MODEL_PATH, SCALER_PATH)
+        else:
+            logger.warning(
+                "⚠️  Model files not found (%s, %s) — detection disabled.",
+                MODEL_PATH, SCALER_PATH,
+            )
 
     if os.path.exists(BACKEND_DB_PATH):
         engine = create_engine(
@@ -124,12 +146,13 @@ def startup_event():
     else:
         logger.warning("⚠️  Decoy DB not found — token mirroring disabled")
 
-    logger.info(
-        "✅ Adaptive deception ready — window_size=%d, decay=%.2f, "
-        "behavior_classes=%s",
-        BEHAVIOR_WINDOW_SIZE, 0.85,
-        ["brute_force", "scanning", "fraud", "unknown_suspicious"],
-    )
+    if not DETECTION_DISABLED:
+        logger.info(
+            "✅ Adaptive deception ready — window_size=%d, decay=%.2f, "
+            "behavior_classes=%s",
+            BEHAVIOR_WINDOW_SIZE, 0.85,
+            ["brute_force", "scanning", "fraud", "unknown_suspicious"],
+        )
 
 
 @app.on_event("shutdown")
@@ -327,6 +350,46 @@ async def reverse_proxy(request: Request, path: str):
     last_signal_time = window.requests[-1].timestamp if window.requests else start_time
     think_time_ms = (start_time - last_signal_time) * 1000
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # Dataset generation mode — skip all detection, forward everything to
+    # the real backend. No sessions are flagged, no decoy routing occurs.
+    # ─────────────────────────────────────────────────────────────────────────
+    if DETECTION_DISABLED:
+        try:
+            upstream = await forward(request, body, f"{BACKEND_URL}/{path}")
+            response_time_ms = int((time.time() - start_time) * 1000)
+
+            db_log(
+                db, req_id, client_ip, request, body_str,
+                upstream.status_code, response_time_ms,
+                forwarded_to_backend=True,
+                session_id=sid,
+                anomaly_score=0.0,
+                routed_to="backend",
+                flagged_as_suspicious=False,
+            )
+
+            return Response(
+                content=upstream.content,
+                status_code=upstream.status_code,
+                headers=dict(upstream.headers),
+            )
+
+        except (httpx.ConnectError, httpx.TimeoutException) as exc:
+            response_time_ms = int((time.time() - start_time) * 1000)
+            logger.error("GATE80 ❌ backend error in generation mode: %s", exc)
+            db.close()
+            return Response(
+                content=b'{"detail": "Backend unavailable"}',
+                status_code=503,
+                headers={"Content-Type": "application/json"},
+            )
+        finally:
+            db.close()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Normal operation — detection active
+    # ─────────────────────────────────────────────────────────────────────────
     pre_flagged = False
     if detector is not None:
         state = detector.get_or_create_session(sid)
