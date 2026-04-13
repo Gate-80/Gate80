@@ -75,7 +75,7 @@ abnormal_scores = model.decision_function(X_abnormal_scaled)
 abnormal_pred = (abnormal_scores < threshold).astype(int)   # 1 = anomaly
 detection_rate = abnormal_pred.mean()
 
-print("\n=== True evaluation ===")
+print()
 print("Threshold:", threshold)
 print("FPR:", fpr)
 print("Detection rate:", detection_rate)
