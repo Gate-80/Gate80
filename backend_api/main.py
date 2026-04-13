@@ -9,8 +9,9 @@ from backend_api.routers import (
     user_authentication
 )
 from backend_api.db.database import init_db
+import backend_api.db.models
 from backend_api.middleware.logging import RequestLoggingMiddleware
-
+from backend_api.routers import onboarding
 app = FastAPI(title="RASD Digital Wallet API", version="1.0.0")
 
 app.add_middleware(RequestLoggingMiddleware)
@@ -56,6 +57,13 @@ def hello():
 
 
 # Include routers
+
+app.include_router(
+    onboarding.router,
+    prefix="/api/v1",
+    tags=["onboarding"]
+)
+
 app.include_router(
     user_authentication.router,
     prefix="/api/v1",

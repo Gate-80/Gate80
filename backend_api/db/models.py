@@ -177,3 +177,78 @@ class AuditLog(Base):
     ip_address = Column(String)  # Client IP address (optional for now)
     meta = Column(JSON)  # Additional context (amounts, counterparty, error messages, etc.)
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
+
+# -----------------------------
+# Onboarding / Decoy System Models
+# -----------------------------
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id = Column(String, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    customer_name = Column(String, nullable=False)
+    source_type = Column(String, nullable=False)   # openapi_file | openapi_url | website_scan
+    source_value = Column(String, nullable=False)  # file path or URL
+    created_at = Column(DateTime(timezone=True), default=now_utc)
+
+    endpoints = relationship(
+        "EndpointInventory",
+        back_populates="project",
+        cascade="all, delete-orphan"
+    )
+
+    decoy_configs = relationship(
+        "DecoyConfig",
+        back_populates="project",
+        cascade="all, delete-orphan"
+    )
+
+
+class EndpointInventory(Base):
+    __tablename__ = "endpoint_inventory"
+
+    id = Column(String, primary_key=True, index=True)
+    project_id = Column(String, ForeignKey("projects.id"), nullable=False)
+
+    path = Column(String, nullable=False)
+    method = Column(String, nullable=False)
+    summary = Column(String)
+    tag = Column(String)
+    requires_auth = Column(Boolean, default=False)
+
+    request_schema_json = Column(JSON)
+    response_schema_json = Column(JSON)
+
+    risk_score = Column(String, default="0")
+    risk_level = Column(String, default="low")
+
+    is_selected_for_decoy = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), default=now_utc)
+
+    project = relationship("Project", back_populates="endpoints")
+
+    decoy_configs = relationship(
+        "DecoyConfig",
+        back_populates="endpoint",
+        cascade="all, delete-orphan"
+    )
+
+
+class DecoyConfig(Base):
+    __tablename__ = "decoy_config"
+
+    id = Column(String, primary_key=True, index=True)
+    project_id = Column(String, ForeignKey("projects.id"), nullable=False)
+    endpoint_id = Column(String, ForeignKey("endpoint_inventory.id"), nullable=False)
+
+    decoy_type = Column(String, nullable=False)   # fake_success | fake_failure | delayed_response | honey_data
+    status_code = Column(String, default="200")
+    response_template = Column(JSON)
+    delay_ms = Column(String, default="0")
+    is_enabled = Column(Boolean, default=True)
+
+    created_at = Column(DateTime(timezone=True), default=now_utc)
+
+    project = relationship("Project", back_populates="decoy_configs")
+    endpoint = relationship("EndpointInventory", back_populates="decoy_configs")
