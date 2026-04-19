@@ -29,6 +29,12 @@ from sqlalchemy.orm import sessionmaker
 from proxy.db.database import SessionLocal, init_db
 from proxy.db.logger import db_log
 from detection.model import AnomalyDetector
+from proxy.behaviour_class import (
+    BEHAVIOR_WINDOW_SIZE,
+    RequestSignal,
+    SessionWindow,
+    classify_behavior,
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Logging
@@ -319,9 +325,15 @@ async def reverse_proxy(request: Request, path: str):
     body     = await request.body()
     body_str = body.decode("utf-8", errors="ignore") if body else None
     db       = SessionLocal()
+    EXCLUDED_PREFIXES = ["/docs", "/redoc", "/openapi"]
+    excluded_path = any(request.url.path.startswith(p) for p in EXCLUDED_PREFIXES)
+    window = get_or_create_window(sid)
+    last_signal = window.requests[-1] if window.requests else None
+    think_time_ms = (start_time - last_signal.timestamp) * 1000.0 if last_signal else 0.0
+    attack_type = window.attack_type
 
     pre_flagged = False
-    if detector is not None:
+    if not excluded_path and detector is not None:
         state = detector.get_or_create_session(sid)
         pre_flagged = state.is_anomalous
     

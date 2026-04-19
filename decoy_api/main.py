@@ -15,7 +15,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
 from decoy_api.db.database import init_db, LogsSession
-from decoy_api.logger import log_decoy_request
+from decoy_api.logger import log_decoy_request, log_deception_plan
 from decoy_api.seed import seed
 from decoy_api.routers import auth, admin_auth, user_accounts, wallet, admin
 from decoy_api.deception.engine import DeceptionEngine
@@ -70,6 +70,8 @@ def startup_event():
 async def deception_middleware(request: Request, call_next):
     attack_type = request.headers.get("X-Attack-Type", "unknown_suspicious")
     session_id  = get_session_id(request)
+    request_id  = getattr(request.state, "request_id", request.headers.get("X-Request-Id") or str(uuid.uuid4()))
+    request_body = getattr(request.state, "body_str", None)
 
     request.state.attack_type = attack_type
 
@@ -85,13 +87,44 @@ async def deception_middleware(request: Request, call_next):
         response_body += chunk
 
     # Post-process: transform body and/or status code
-    modified_body, modified_status = await deception_engine.post_process(
+    modified_body, modified_status, plan_result, application_result = await deception_engine.post_process(
         body=response_body,
         status_code=response.status_code,
         attack_type=attack_type,
+        method=request.method,
         path=request.url.path,
         session_id=session_id,
+        request_id=request_id,
+        query_params=dict(request.query_params),
+        request_body=request_body,
     )
+
+    plan_db = LogsSession()
+    try:
+        log_deception_plan(
+            db=plan_db,
+            request_id=request_id,
+            session_id=session_id,
+            attack_type=attack_type,
+            method=request.method,
+            path=request.url.path,
+            plan_id=plan_result.plan.plan_id,
+            plan_source=plan_result.source,
+            model_name=plan_result.model_name,
+            prompt_version=plan_result.prompt_version,
+            confidence=plan_result.plan.confidence,
+            rationale=plan_result.plan.rationale,
+            generation_error=plan_result.error_message,
+            response_status_before=response.status_code,
+            response_status_after=modified_status,
+            raw_plan=plan_result.raw_plan,
+            validated_plan=plan_result.plan.model_dump(),
+            applied_actions=application_result.applied_actions,
+            rejected_actions=application_result.rejected_actions,
+            final_body_preview=application_result.final_body_preview,
+        )
+    finally:
+        plan_db.close()
 
     headers = {
         k: v for k, v in response.headers.items()
@@ -115,6 +148,8 @@ async def log_all_requests(request: Request, call_next):
     start      = time.time()
     body_bytes = await request.body()
     body_str   = body_bytes.decode("utf-8", errors="ignore") if body_bytes else None
+    request.state.request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
+    request.state.body_str = body_str
 
     async def receive():
         return {"type": "http.request", "body": body_bytes}
@@ -127,7 +162,7 @@ async def log_all_requests(request: Request, call_next):
     try:
         log_decoy_request(
             db=db,
-            request_id=request.headers.get("X-Request-Id") or str(uuid.uuid4()),
+            request_id=request.state.request_id,
             client_ip=get_client_ip(request),
             session_id=get_session_id(request),
             method=request.method,

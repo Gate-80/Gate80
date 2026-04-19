@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from backend_api.db.database import get_db
 from backend_api.db.models import Admin, AdminSession
 from backend_api.db.audit_helper import log_admin_login, log_admin_logout, log_failed_action
+from backend_api.security import hash_password, password_needs_rehash, verify_password
 
 router = APIRouter(prefix="/admin/auth", tags=["admin-authentication"])
 
@@ -67,7 +68,7 @@ def admin_sign_in(payload: AdminLoginRequest, db: Session = Depends(get_db)):
     # Find admin by username
     admin = db.query(Admin).filter_by(username=payload.username).first()
     
-    if not admin or admin.password != payload.password:
+    if not admin or not verify_password(payload.password, admin.password):
         # Log failed login
         log_failed_action(
             db=db,
@@ -77,6 +78,9 @@ def admin_sign_in(payload: AdminLoginRequest, db: Session = Depends(get_db)):
             error_message=f"Invalid credentials for username: {payload.username}"
         )
         raise HTTPException(status_code=401, detail="Invalid admin credentials")
+
+    if password_needs_rehash(admin.password):
+        admin.password = hash_password(payload.password)
 
     # Generate session token
     token = token_urlsafe(24)

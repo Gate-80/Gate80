@@ -21,7 +21,7 @@ def init_db():
     holds the full attack timeline correlatable by session_id.
     """
     from proxy.db.models import ProxyRequest
-    from decoy_api.db.log_models import DecoyRequest
+    from decoy_api.db.log_models import DecoyRequest, DeceptionPlanLog
     Base.metadata.create_all(bind=engine)
 
 

@@ -19,8 +19,31 @@ Run from project root:
 import httpx
 import time
 import json
+import random
 
 PROXY = "http://127.0.0.1:8080/api/v1"
+
+TEST_USERS = {
+    "normal": {
+        "email": "taif.alsaadi@gmail.com",
+        "password": "password123",
+    },
+    "scanning": {
+        "email": "hanan.alharbi@gmail.com",
+        "password": "password123",
+    },
+    "fraud": {
+        "email": "queenrama@gmail.com",
+        "password": "imthequ33n",
+    },
+}
+
+DEMO_SOURCE_IPS = {
+    "normal": "8.8.8.8",          # United States
+    "brute_force": "9.9.9.9",     # Switzerland
+    "scanning": "1.1.1.1",        # Australia
+    "fraud": "185.228.168.9",     # United Kingdom
+}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -68,12 +91,19 @@ def request(client: httpx.Client, method: str, path: str,
         return 0, {}
 
 
-def get_token(client: httpx.Client, email: str, password: str) -> tuple:
+def get_token(
+    client: httpx.Client,
+    email: str,
+    password: str,
+    forwarded_for: str | None = None,
+) -> tuple:
     """Sign in and return (token, user_id) or (None, None) on failure."""
     start = time.time()
     try:
+        headers = {"X-Forwarded-For": forwarded_for} if forwarded_for else None
         r = client.post(
             f"{PROXY}/auth/sign-in",
+            headers=headers,
             json={"email": email, "password": password},
             timeout=10
         )
@@ -90,13 +120,21 @@ def get_token(client: httpx.Client, email: str, password: str) -> tuple:
         return None, None
 
 
+def random_test_ip() -> str:
+    """
+    Pick a real public demo IP so the SOC map can show country/city names
+    after sync_to_es.py enriches the logs.
+    """
+    return random.choice(list(DEMO_SOURCE_IPS.values()))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Test 1 — Normal Traffic
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_normal_traffic(token: str, user_id: str):
+def test_normal_traffic(token: str, user_id: str, source_ip: str):
     sep("TEST 1 — NORMAL TRAFFIC (should reach real backend)")
-    headers = {"X-User-Token": token}
+    headers = {"X-User-Token": token, "X-Forwarded-For": source_ip}
 
     with httpx.Client() as c:
         time.sleep(0.3)
@@ -126,13 +164,15 @@ def test_normal_traffic(token: str, user_id: str):
 # Test 2 — Brute Force
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_brute_force():
+def test_brute_force(source_ip: str):
     sep("TEST 2 — BRUTE FORCE (expect: brute_force + progressive lock)")
+    headers = {"X-Forwarded-For": source_ip}
 
     with httpx.Client() as c:
         print("  Phase 1: Rapid auth failures to trigger detection...\n")
         for i in range(1, 11):
             request(c, "POST", "/auth/sign-in",
+                    headers=headers,
                     json_body={"email": "victim@example.com",
                                "password": f"wrongpass{i}"},
                     label=f"POST /auth/sign-in attempt #{i}")
@@ -141,6 +181,7 @@ def test_brute_force():
         print("\n  Phase 2: Continued attempts — expect lock escalation...\n")
         for i in range(1, 7):
             request(c, "POST", "/auth/sign-in",
+                    headers=headers,
                     json_body={"email": "victim@example.com",
                                "password": f"wrongpass{i}"},
                     label=f"POST /auth/sign-in (decoy) attempt #{i}")
@@ -157,10 +198,10 @@ def test_brute_force():
 # Test 3 — Scanning
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_scanning(token: str, user_id: str):
+def test_scanning(token: str, user_id: str, source_ip: str):
     sep("TEST 3 — ENDPOINT SCANNING (expect: scanning + rate limiting)")
 
-    headers = {"X-User-Token": token}
+    headers = {"X-User-Token": token, "X-Forwarded-For": source_ip}
 
     endpoints = [
         ("GET",  "/admin/users",                    "GET /admin/users"),
@@ -199,10 +240,10 @@ def test_scanning(token: str, user_id: str):
 # Test 4 — Fraud
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_fraud(token: str, user_id: str):
+def test_fraud(token: str, user_id: str, source_ip: str):
     sep("TEST 4 — FINANCIAL FRAUD (expect: fraud + distorted responses)")
 
-    headers = {"X-User-Token": token}
+    headers = {"X-User-Token": token, "X-Forwarded-For": source_ip}
 
     with httpx.Client() as c:
         print("  Phase 1: Heavy financial ops to trigger fraud detection...\n")
@@ -256,28 +297,50 @@ if __name__ == "__main__":
     sep("PRE-TEST — Obtaining tokens for all tests")
     print("  Getting tokens before brute force flags ip:127.0.0.1...\n")
 
+    bootstrap_ips = {
+        "normal": DEMO_SOURCE_IPS["normal"],
+        "brute_force": DEMO_SOURCE_IPS["brute_force"],
+        "scanning": DEMO_SOURCE_IPS["scanning"],
+        "fraud": DEMO_SOURCE_IPS["fraud"],
+    }
+
     with httpx.Client() as c:
-        normal_token,   normal_uid   = get_token(c, "user@example.com",  "password123")
-        scanning_token, scanning_uid = get_token(c, "user@example.com",  "password123")
-        fraud_token,    fraud_uid    = get_token(c, "user@example.com",  "password123")
+        normal_token, normal_uid = get_token(
+            c,
+            TEST_USERS["normal"]["email"],
+            TEST_USERS["normal"]["password"],
+            bootstrap_ips["normal"],
+        )
+        scanning_token, scanning_uid = get_token(
+            c,
+            TEST_USERS["scanning"]["email"],
+            TEST_USERS["scanning"]["password"],
+            bootstrap_ips["scanning"],
+        )
+        fraud_token, fraud_uid = get_token(
+            c,
+            TEST_USERS["fraud"]["email"],
+            TEST_USERS["fraud"]["password"],
+            bootstrap_ips["fraud"],
+        )
 
     if not all([normal_token, scanning_token, fraud_token]):
-        print("\n  ❌ Could not obtain all tokens — check backend is running")
+        print("\n  ❌ Could not obtain all tokens — check test credentials or reset the backend DB seed")
         exit(1)
 
     print("\n  ✅ All tokens obtained — running tests\n")
 
     # ── Run tests in order ────────────────────────────────────────────────────
-    test_normal_traffic(normal_token, normal_uid)
+    test_normal_traffic(normal_token, normal_uid, bootstrap_ips["normal"])
     time.sleep(1)
 
-    test_brute_force()
+    test_brute_force(bootstrap_ips["brute_force"])
     time.sleep(1)
 
-    test_scanning(scanning_token, scanning_uid)
+    test_scanning(scanning_token, scanning_uid, bootstrap_ips["scanning"])
     time.sleep(1)
 
-    test_fraud(fraud_token, fraud_uid)
+    test_fraud(fraud_token, fraud_uid, bootstrap_ips["fraud"])
 
     sep("ALL TESTS COMPLETE")
     print("  Run this to verify DB:\n")

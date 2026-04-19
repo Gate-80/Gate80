@@ -1,0 +1,70 @@
+GATE80 Gemini Adaptive Deception - Test Steps
+
+1. Open the project and activate the environment
+
+   cd /Users/wedalotibi/RASD_adaptive-api-deception
+   source .venv/bin/activate
+
+2. Set the Gemini environment variables before starting the decoy
+
+   export GEMINI_API_KEY="YOUR_KEY_HERE"
+   export GEMINI_API_VERSION="v1"
+   export GEMINI_MODEL="gemini-2.5-flash"
+
+3. Start the three services in separate terminals
+
+   Backend:
+   uvicorn backend_api.main:app --host 127.0.0.1 --port 8000
+
+   Decoy:
+   uvicorn decoy_api.main:app --host 127.0.0.1 --port 8001
+
+   Proxy:
+   uvicorn proxy.main:app --host 127.0.0.1 --port 8080
+
+4. Confirm the services are up
+
+   curl http://127.0.0.1:8000/health
+   curl http://127.0.0.1:8001/health
+   curl http://127.0.0.1:8080/health
+
+5. Run the adaptive test suite
+
+   python scripts/test_adaptive_decoy.py
+
+6. Check whether plans came from Gemini or fallback
+
+   sqlite3 proxy_logs.db "
+   SELECT request_id, attack_type, plan_source, generation_error,
+          applied_actions, rejected_actions
+   FROM deception_plan_logs
+   ORDER BY id DESC
+   LIMIT 20;
+   "
+
+7. Quick manual decoy trigger for brute-force
+
+   for i in 1 2 3 4 5 6; do
+     curl -s -X POST http://127.0.0.1:8080/api/v1/auth/sign-in \
+       -H 'Content-Type: application/json' \
+       -d '{"email":"victim@example.com","password":"wrongpass"}'
+     echo
+   done
+
+8. Send logs to Elasticsearch
+
+   python sync_to_es.py
+
+9. Check the Elasticsearch indices
+
+   - rasd-api-logs
+   - rasd-deception-plans
+
+Expected Result
+
+- Suspicious sessions should be routed from the proxy to the decoy.
+- The decoy strategy applies the baseline deception behavior first.
+- Gemini generates a structured deception plan for the current request.
+- FastAPI validation allows only attack-type-safe changes.
+- Every plan is logged in proxy_logs.db in the deception_plan_logs table.
+- Successful Gemini participation appears as plan_source = gemini.

@@ -6,9 +6,17 @@ from typing import Any, Dict, List
 
 def load_openapi_document(raw_text: str) -> Dict[str, Any]:
     try:
-        return json.loads(raw_text)
+        spec = json.loads(raw_text)
     except json.JSONDecodeError:
-        return yaml.safe_load(raw_text)
+        try:
+            spec = yaml.safe_load(raw_text)
+        except yaml.YAMLError as exc:
+            raise ValueError(f"Invalid JSON/YAML OpenAPI document: {exc}") from exc
+
+    if not isinstance(spec, dict):
+        raise ValueError("Invalid OpenAPI document: root value must be an object.")
+
+    return spec
 
 
 def parse_openapi_endpoints(spec: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -27,19 +35,21 @@ def parse_openapi_endpoints(spec: Dict[str, Any]) -> List[Dict[str, Any]]:
 
             operation = operation or {}
             tags = operation.get("tags", [])
-            summary = operation.get("summary", "")
+            summary = operation.get("summary") or operation.get("description") or ""
             security = operation.get("security", spec.get("security", []))
             requires_auth = bool(security)
 
             request_schema = {}
             request_body = operation.get("requestBody", {})
-            content = request_body.get("content", {})
+            content = request_body.get("content", {}) if isinstance(request_body, dict) else {}
             if "application/json" in content:
                 request_schema = content["application/json"].get("schema", {})
 
             response_schema = {}
             responses = operation.get("responses", {})
-            for code, response in responses.items():
+            for response in responses.values():
+                if not isinstance(response, dict):
+                    continue
                 response_content = response.get("content", {})
                 if "application/json" in response_content:
                     response_schema = response_content["application/json"].get("schema", {})

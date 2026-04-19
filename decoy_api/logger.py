@@ -9,7 +9,7 @@ import json
 import logging
 from typing import Optional
 from sqlalchemy.orm import Session
-from decoy_api.db.log_models import DecoyRequest
+from decoy_api.db.log_models import DecoyRequest, DeceptionPlanLog
 
 logger = logging.getLogger("decoy.logger")
 
@@ -61,4 +61,56 @@ def log_decoy_request(
         )
     except Exception as exc:
         logger.error("Failed to log decoy request %s: %s", request_id, exc)
+        db.rollback()
+
+
+def log_deception_plan(
+    db: Session,
+    *,
+    request_id: str,
+    session_id: str,
+    attack_type: str,
+    method: str,
+    path: str,
+    plan_id: str,
+    plan_source: str,
+    model_name: Optional[str],
+    prompt_version: Optional[str],
+    confidence: Optional[float],
+    rationale: Optional[str],
+    generation_error: Optional[str],
+    response_status_before: int,
+    response_status_after: int,
+    raw_plan: Optional[dict],
+    validated_plan: dict,
+    applied_actions: list[str],
+    rejected_actions: list[str],
+    final_body_preview: Optional[str],
+) -> None:
+    try:
+        record = DeceptionPlanLog(
+            request_id=request_id,
+            session_id=session_id,
+            attack_type=attack_type,
+            method=method,
+            path=path,
+            plan_id=plan_id,
+            plan_source=plan_source,
+            model_name=model_name,
+            prompt_version=prompt_version,
+            confidence=confidence,
+            rationale=rationale,
+            generation_error=generation_error,
+            response_status_before=response_status_before,
+            response_status_after=response_status_after,
+            raw_plan=json.dumps(raw_plan) if raw_plan else None,
+            validated_plan=json.dumps(validated_plan),
+            applied_actions=json.dumps(applied_actions),
+            rejected_actions=json.dumps(rejected_actions),
+            final_body_preview=final_body_preview,
+        )
+        db.add(record)
+        db.commit()
+    except Exception as exc:
+        logger.error("Failed to log deception plan %s: %s", request_id, exc)
         db.rollback()

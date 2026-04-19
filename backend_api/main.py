@@ -1,18 +1,36 @@
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from backend_api.routers import (
     admin_authentication,
     admin_operations,
     user_accounts,
     wallet,
-    user_authentication
+    user_authentication,
+    projects,
 )
 from backend_api.db.database import init_db
 import backend_api.db.models
 from backend_api.middleware.logging import RequestLoggingMiddleware
 from backend_api.routers import onboarding
 app = FastAPI(title="RASD Digital Wallet API", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost",
+        "http://127.0.0.1",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.add_middleware(RequestLoggingMiddleware)
 
@@ -29,8 +47,14 @@ def startup_event():
 @app.middleware("http")
 async def block_direct_backend_access(request: Request, call_next):
     """Block direct access to backend - requests must come through proxy"""
-    # Only allow health check (for monitoring/debugging)
-    if request.url.path == "/health":
+    # Allow health checks, browser preflight, and onboarding setup during local UI onboarding.
+    if (
+        request.method == "OPTIONS"
+        or request.url.path == "/health"
+        or request.url.path.startswith("/api/v1/onboarding")
+        or request.url.path.startswith("/api/v1/auth")
+        or request.url.path.startswith("/api/v1/projects")
+    ):
         return await call_next(request)
 
     # Check for proxy header, all other requests must have proxy header
@@ -62,6 +86,12 @@ app.include_router(
     onboarding.router,
     prefix="/api/v1",
     tags=["onboarding"]
+)
+
+app.include_router(
+    projects.router,
+    prefix="/api/v1",
+    tags=["projects"]
 )
 
 app.include_router(
