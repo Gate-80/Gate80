@@ -30,6 +30,8 @@ def score_endpoint(path: str, method: str, tag: str, requires_auth: bool) -> tup
     if method.upper() in {"POST", "PUT", "PATCH", "DELETE"}:
         score += 10
 
+    score = max(score, 0)
+
     if score >= 40:
         return score, "high"
     if score >= 15:

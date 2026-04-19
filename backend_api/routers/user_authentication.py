@@ -10,6 +10,7 @@ import string
 from backend_api.db.database import get_db
 from backend_api.db.models import User, UserSession, Wallet, BankAccount, WalletStatus
 from backend_api.db.audit_helper import log_user_login, log_user_logout, log_failed_action
+from backend_api.security import hash_password, password_needs_rehash, verify_password
 
 router = APIRouter(prefix="/auth", tags=["user-authentication"])
 
@@ -20,7 +21,6 @@ SAUDI_BANKS = [
     "Banque Saudi Fransi",
     "Arab National Bank",
 ]
-
 
 # -----------------------------
 # Helper Functions
@@ -134,7 +134,7 @@ def user_sign_up(payload: UserSignUpRequest, db: Session = Depends(get_db)):
         id=new_user_id,
         full_name=payload.full_name,
         email=payload.email,
-        password=payload.password,  # Note: Should be hashed in production
+        password=hash_password(payload.password),
         phone=payload.phone,
         city=payload.city,
         is_verified=False
@@ -187,7 +187,7 @@ def user_sign_in(payload: UserSignInRequest, db: Session = Depends(get_db)):
     """
     user = db.query(User).filter_by(email=payload.email).first()
 
-    if not user or user.password != payload.password:
+    if not user or not verify_password(payload.password, user.password):
         log_failed_action(
             db=db,
             event="USER_LOGIN_FAILED",
@@ -196,6 +196,9 @@ def user_sign_in(payload: UserSignInRequest, db: Session = Depends(get_db)):
             error_message="Invalid email or password"
         )
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    if password_needs_rehash(user.password):
+        user.password = hash_password(payload.password)
 
     token = token_urlsafe(24)
     session = UserSession(token=token, user_id=user.id)

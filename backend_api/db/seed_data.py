@@ -11,6 +11,7 @@ from backend_api.db.models import (
     User, BankAccount, Wallet, Transaction, Payment, Admin,
     TransactionStatus, TransactionType, PaymentStatus, WalletStatus
 )
+from backend_api.security import hash_password
 from datetime import datetime, timezone
 
 
@@ -40,7 +41,7 @@ def seed_database():
                 id="u_1001",
                 full_name="Taif Alsaadi",
                 email="taif.alsaadi@gmail.com",
-                password="password123",  # In production: hash this
+                password=hash_password("password123"),
                 phone="+9665XXXXXXX",
                 city="Jeddah",
                 is_verified=True,
@@ -51,7 +52,7 @@ def seed_database():
                 id="u_1002",
                 full_name="Hanan Alharbi",
                 email="hanan.alharbi@gmail.com",
-                password="password123",
+                password=hash_password("password123"),
                 phone="+9665XXXXXXX",
                 city="Riyadh",
                 is_verified=True,
@@ -62,7 +63,7 @@ def seed_database():
                 id="u_1003",
                 full_name="Queen RAMA",
                 email="queenrama@gmail.com",
-                password="imthequ33n",
+                password=hash_password("imthequ33n"),
                 phone="+9665XXXXXXX",
                 city="Jeddah",
                 is_verified=True,
@@ -73,7 +74,7 @@ def seed_database():
                 id="u_1004",
                 full_name="Test User",
                 email="user@example.com",
-                password="password123",
+                password=hash_password("password123"),
                 phone="+9665XXXXXXX",
                 city="Jeddah",
                 is_verified=True,
@@ -268,7 +269,7 @@ def seed_database():
         admin = Admin(
             id="a_0001",
             username="admin",
-            password="admin123",  # In production hash this
+            password=hash_password("admin123"),
             role="SUPER_ADMIN",
             created_at=datetime(2026, 2, 1, 10, 0, 0, tzinfo=timezone.utc),
             updated_at=datetime(2026, 2, 1, 10, 0, 0, tzinfo=timezone.utc),

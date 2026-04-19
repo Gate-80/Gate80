@@ -24,6 +24,12 @@ from decoy_api.deception.strategies.brute_force import BruteForceStrategy
 from decoy_api.deception.strategies.scanning    import ScanningStrategy
 from decoy_api.deception.strategies.fraud       import FraudStrategy
 from decoy_api.deception.strategies.unknown     import UnknownStrategy
+from decoy_api.deception.planner import (
+    GeminiDeceptionPlanner,
+    PlanApplicationResult,
+    PlanContext,
+    PlanGenerationResult,
+)
 
 logger = logging.getLogger("decoy.deception.engine")
 
@@ -41,6 +47,7 @@ class DeceptionEngine:
             "unknown_suspicious": UnknownStrategy(),
         }
         self._engine_state: dict = {}
+        self._planner = GeminiDeceptionPlanner()
 
         logger.info(
             "GATE80 DeceptionEngine initialised — strategies: %s",
@@ -66,9 +73,13 @@ class DeceptionEngine:
         body: bytes,
         status_code: int,
         attack_type: str,
+        method: str,
         path: str,
         session_id: str,
-    ) -> tuple[bytes, int]:
+        request_id: str,
+        query_params: dict | None = None,
+        request_body: str | None = None,
+    ) -> tuple[bytes, int, PlanGenerationResult, PlanApplicationResult]:
         # ── Increment shared session-level request counter ────────────────────
         # This happens BEFORE dispatching to the strategy so the counter
         # reflects the current request. The scanning strategy reads this
@@ -87,11 +98,40 @@ class DeceptionEngine:
             body, status_code, path, session_id, self._engine_state
         )
 
-        if modified_status != status_code or modified_body != body:
+        context = PlanContext(
+            request_id=request_id,
+            session_id=session_id,
+            attack_type=attack_type,
+            method=method,
+            path=path,
+            query_params=query_params or {},
+            request_body=request_body,
+            response_status=modified_status,
+            response_body_preview=modified_body.decode("utf-8", errors="ignore"),
+            decoy_request_count=self._engine_state[count_key],
+        )
+        plan_result = await self._planner.generate_plan(context)
+        final_body, final_status, application_result = self._planner.apply_plan(
+            plan_result.plan,
+            attack_type,
+            modified_body,
+            modified_status,
+        )
+
+        if final_status != status_code or final_body != body:
             logger.info(
                 "DECOY 🎭 [ENGINE] transformed response: "
                 "attack_type=%-20s  path=%-40s  %d → %d",
-                attack_type, path, status_code, modified_status,
+                attack_type, path, status_code, final_status,
             )
 
-        return modified_body, modified_status
+        logger.info(
+            "DECOY 🧠 [PLAN] request=%s source=%s attack_type=%s applied=%d rejected=%d",
+            request_id,
+            plan_result.source,
+            attack_type,
+            len(application_result.applied_actions),
+            len(application_result.rejected_actions),
+        )
+
+        return final_body, final_status, plan_result, application_result

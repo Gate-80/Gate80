@@ -62,7 +62,7 @@ def init_db():
         DecoyUser, DecoyWallet, DecoyTransaction,
         DecoyUserSession, DecoyAdminSession, DecoyBankAccount, DecoyPayment
     )
-    from decoy_api.db.log_models import DecoyRequest
+    from decoy_api.db.log_models import DecoyRequest, DeceptionPlanLog
 
     # Wallet state in decoy_wallet.db
     WalletBase.metadata.create_all(bind=wallet_engine)

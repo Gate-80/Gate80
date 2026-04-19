@@ -12,6 +12,8 @@ At a high level, the system:
 - Forwards legitimate traffic to real backend services
 - Redirects suspicious traffic to realistic digital-twin API decoys
 - Mirrors attacker sessions seamlessly so deception is undetectable
+- Can ask Gemini for structured deception plans on decoy requests
+- Validates generated plans before applying only allowlisted mutations
 - Collects logs and attacker interaction data for analysis and correlation
 
 This project is developed for **academic and research purposes**.
@@ -182,6 +184,10 @@ GATE80/
 │   ├── main.py
 │   ├── seed.py
 │   ├── logger.py
+│   ├── deception/
+│   │   ├── engine.py
+│   │   ├── planner.py
+│   │   └── strategies/
 │   ├── db/
 │   │   ├── database.py
 │   │   ├── models.py
@@ -262,6 +268,17 @@ source .venv/bin/activate        # macOS/Linux
 ```bash
 pip install -r requirements.txt
 ```
+
+### 4. Configure Gemini (Optional but Recommended)
+
+Set a Gemini API key before starting the decoy service if you want live LLM-generated deception plans:
+
+```bash
+export GEMINI_API_KEY="your_api_key"
+export GEMINI_MODEL="gemini-1.5-flash"
+```
+
+If `GEMINI_API_KEY` is not set, GATE80 falls back to a local structured planner and still logs every plan.
 
 ### 4. Seed the Backend Database
 

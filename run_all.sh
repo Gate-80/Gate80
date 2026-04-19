@@ -10,6 +10,7 @@ echo "🚀 Starting GATE80 full stack..."
 # -----------------------------
 ES_BIN="/opt/homebrew/opt/elasticsearch-full/bin/elasticsearch"
 #KIBANA_BIN="/opt/homebrew/opt/kibana-full/bin/kibana"
+ES_JAVA_OPTS="${ES_JAVA_OPTS:--Xms1g -Xmx1g}"
 
 PROXY_PORT=8080
 BACKEND_PORT=8000
@@ -49,8 +50,14 @@ if is_port_busy "$ES_PORT"; then
   echo "⚠️  Elasticsearch already running on port $ES_PORT"
 else
   echo "▶ Starting Elasticsearch..."
-  "$ES_BIN" >/tmp/gate80-elasticsearch.log 2>&1 &
+  ES_JAVA_OPTS="$ES_JAVA_OPTS" "$ES_BIN" >/tmp/gate80-elasticsearch.log 2>&1 &
   sleep 10
+  if is_port_busy "$ES_PORT"; then
+    echo "✅ Elasticsearch is listening on port $ES_PORT"
+  else
+    echo "⚠️  Elasticsearch did not bind to port $ES_PORT yet"
+    echo "    Check /tmp/gate80-elasticsearch.log"
+  fi
 fi
 
 
