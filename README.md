@@ -533,7 +533,6 @@ The GATE80 system uses the **Elastic Stack** to monitor and visualize API traffi
 |----------|---------|
 | Elasticsearch | Stores and indexes logs |
 | Logstash | Extracts from proxy_logs.db and indexes into Elasticsearch |
-| Kibana | Visualizes traffic, anomaly scores, and decoy interactions |
 
 ### Prerequisites
 
@@ -547,13 +546,12 @@ The GATE80 system uses the **Elastic Stack** to monitor and visualize API traffi
 brew tap elastic/tap
 brew install elastic/tap/elasticsearch-full
 brew install elastic/tap/logstash-full
-brew install elastic/tap/kibana-full
 ```
 
 **Linux (apt)**
 ```bash
 wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
-sudo apt-get install elasticsearch logstash kibana
+sudo apt-get install elasticsearch logstash 
 ```
 
 **Windows / All Platforms**
@@ -568,14 +566,12 @@ https://www.elastic.co/downloads/
 **macOS**
 ```bash
 brew services start elastic/tap/elasticsearch-full
-brew services start elastic/tap/kibana-full
 logstash -f logstash/pipeline.conf
 ```
 
 **Linux**
 ```bash
 sudo systemctl start elasticsearch
-sudo systemctl start kibana
 logstash -f logstash/pipeline.conf
 ```
 
@@ -583,7 +579,6 @@ logstash -f logstash/pipeline.conf
 ```bash
 # Run from Elasticsearch/Logstash/Kibana installation directories
 bin\elasticsearch.bat
-bin\kibana.bat
 bin\logstash.bat -f logstash/pipeline.conf
 ```
 
@@ -601,10 +596,6 @@ Expected response:
 }
 ```
 
-**Kibana:**
-```
-http://localhost:5601
-```
 
 ### Creating a Kibana Index Pattern
 
@@ -643,7 +634,7 @@ Logstash
 Elasticsearch
       │
       ▼
-Kibana Dashboard
+ Dashboard
 ```
 
 1. The **Reverse Proxy** intercepts all API traffic.
