@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from backend_api.routers import (
     admin_authentication,
     admin_operations,
+    telemetry,
     user_accounts,
     wallet,
     user_authentication,
@@ -54,6 +55,7 @@ async def block_direct_backend_access(request: Request, call_next):
         or request.url.path.startswith("/api/v1/onboarding")
         or request.url.path.startswith("/api/v1/auth")
         or request.url.path.startswith("/api/v1/projects")
+        or request.url.path.startswith("/api/v1/telemetry")
     ):
         return await call_next(request)
 
@@ -92,6 +94,12 @@ app.include_router(
     projects.router,
     prefix="/api/v1",
     tags=["projects"]
+)
+
+app.include_router(
+    telemetry.router,
+    prefix="/api/v1",
+    tags=["telemetry"]
 )
 
 app.include_router(
