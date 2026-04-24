@@ -234,6 +234,54 @@ def main():
     )
     print(f"  CV F1: {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
 
+    # ── Per-attack-type stratified CV ─────────────────────────────────────────
+    # Evaluates each attack type across all 500 sessions using stratified
+    # CV by attack_type label — more statistically reliable than test set
+    # evaluation which only has 2–5 samples per type.
+    print("\n  Per-attack-type stratified CV (all sessions):")
+    attack_cv_results = {}
+
+    for atype in ATTACK_TYPES:
+        if atype == "normal":
+            continue
+
+        # One-vs-rest: this attack type = 1, everything else = 0
+        mask_attack  = df["attack_type"] == atype
+        mask_normal  = df["attack_type"] == "normal"
+        mask_subset  = mask_attack | mask_normal
+
+        if mask_attack.sum() < 5:
+            print(f"  {atype:<25} skipped (n={mask_attack.sum()} — too few samples)")
+            continue
+
+        X_sub = X_scaled[mask_subset]
+        y_sub = (df[mask_subset]["attack_type"] == atype).astype(int).values
+
+        cv_sub = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        sub_scores = cross_val_score(
+            RandomForestClassifier(
+                n_estimators=300, class_weight="balanced",
+                random_state=42, n_jobs=-1
+            ),
+            X_sub, y_sub, cv=cv_sub, scoring="f1", n_jobs=-1,
+        )
+
+        attack_cv_results[atype] = {
+            "mean": sub_scores.mean(),
+            "std":  sub_scores.std(),
+            "n":    int(mask_attack.sum()),
+        }
+        print(f"  {atype:<25} F1={sub_scores.mean():.4f} ± {sub_scores.std():.4f}  (n={mask_attack.sum()})")
+
+    # Add to training report
+    with open(MODEL_DIR / "training_report.txt", "a") as f:
+        f.write("\nPer-attack-type stratified CV (one-vs-rest):\n")
+        for atype, res in attack_cv_results.items():
+            f.write(
+                f"  {atype:<25} F1={res['mean']:.4f} ± {res['std']:.4f}  "
+                f"(n={res['n']})\n"
+            )
+
     # ── Feature importance ────────────────────────────────────────────────────
     importances = pd.Series(rf.feature_importances_, index=FEATURE_NAMES)
     importances = importances.sort_values(ascending=False)
