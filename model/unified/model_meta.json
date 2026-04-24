@@ -1,0 +1,178 @@
+{
+  "feature_columns": [
+    "total_requests",
+    "session_duration_sec",
+    "requests_per_minute",
+    "failed_login_count",
+    "login_attempts",
+    "failed_login_ratio",
+    "login_success",
+    "error_ratio",
+    "error_4xx_count",
+    "error_5xx_count",
+    "http_4xx_ratio",
+    "http_5xx_ratio",
+    "unique_endpoints",
+    "endpoint_entropy",
+    "has_admin_access",
+    "admin_action_count",
+    "admin_ratio",
+    "wallet_action_count",
+    "wallet_action_ratio",
+    "transfer_count",
+    "topup_count",
+    "withdraw_count",
+    "pay_bill_count",
+    "financial_error_count",
+    "avg_think_time_ms",
+    "std_think_time_ms",
+    "min_think_time_ms",
+    "max_think_time_ms",
+    "think_time_cv",
+    "avg_response_time_ms"
+  ],
+  "n_features": 30,
+  "train_sessions": 1595,
+  "train_normal": 1358,
+  "train_abnormal": 237,
+  "random_forest": {
+    "path": "model/unified/random_forest.pkl",
+    "n_estimators": 200,
+    "class_weight": "balanced",
+    "min_samples_leaf": 2,
+    "random_state": 42
+  },
+  "isolation_forest": {
+    "path": "model/unified/isolation_forest.pkl",
+    "n_estimators": 200,
+    "contamination": "auto",
+    "trained_on": "normal_sessions_only",
+    "random_state": 42
+  },
+  "scaler": {
+    "path": "model/unified/scaler.pkl",
+    "type": "StandardScaler"
+  },
+  "feature_importance": [
+    {
+      "feature": "min_think_time_ms",
+      "importance": 0.208949
+    },
+    {
+      "feature": "think_time_cv",
+      "importance": 0.16903
+    },
+    {
+      "feature": "avg_think_time_ms",
+      "importance": 0.147026
+    },
+    {
+      "feature": "requests_per_minute",
+      "importance": 0.10732
+    },
+    {
+      "feature": "error_4xx_count",
+      "importance": 0.061317
+    },
+    {
+      "feature": "http_4xx_ratio",
+      "importance": 0.051323
+    },
+    {
+      "feature": "total_requests",
+      "importance": 0.0477
+    },
+    {
+      "feature": "error_ratio",
+      "importance": 0.03811
+    },
+    {
+      "feature": "max_think_time_ms",
+      "importance": 0.032821
+    },
+    {
+      "feature": "login_attempts",
+      "importance": 0.013918
+    },
+    {
+      "feature": "std_think_time_ms",
+      "importance": 0.012841
+    },
+    {
+      "feature": "failed_login_count",
+      "importance": 0.012791
+    },
+    {
+      "feature": "wallet_action_ratio",
+      "importance": 0.012543
+    },
+    {
+      "feature": "wallet_action_count",
+      "importance": 0.011796
+    },
+    {
+      "feature": "endpoint_entropy",
+      "importance": 0.011761
+    },
+    {
+      "feature": "failed_login_ratio",
+      "importance": 0.009936
+    },
+    {
+      "feature": "withdraw_count",
+      "importance": 0.009023
+    },
+    {
+      "feature": "session_duration_sec",
+      "importance": 0.008577
+    },
+    {
+      "feature": "unique_endpoints",
+      "importance": 0.007923
+    },
+    {
+      "feature": "transfer_count",
+      "importance": 0.006138
+    },
+    {
+      "feature": "admin_ratio",
+      "importance": 0.005266
+    },
+    {
+      "feature": "topup_count",
+      "importance": 0.003483
+    },
+    {
+      "feature": "admin_action_count",
+      "importance": 0.0026
+    },
+    {
+      "feature": "login_success",
+      "importance": 0.002068
+    },
+    {
+      "feature": "avg_response_time_ms",
+      "importance": 0.002034
+    },
+    {
+      "feature": "http_5xx_ratio",
+      "importance": 0.001756
+    },
+    {
+      "feature": "has_admin_access",
+      "importance": 0.000966
+    },
+    {
+      "feature": "pay_bill_count",
+      "importance": 0.000526
+    },
+    {
+      "feature": "error_5xx_count",
+      "importance": 0.000261
+    },
+    {
+      "feature": "financial_error_count",
+      "importance": 0.000197
+    }
+  ]
+}
