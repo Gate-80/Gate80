@@ -1,0 +1,1 @@
+timestamp,session_id,persona,email,user_id,action,method,path,status_code,is_failed_login,response_time_ms,think_time_ms,body_size,has_auth_token,endpoint_category,response_length,geo_location,client_type,user_agent,source_tool,label,session_type

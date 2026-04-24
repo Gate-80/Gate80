@@ -1,0 +1,97 @@
+{
+  "test_sessions": 400,
+  "test_normal": 340,
+  "test_abnormal": 60,
+  "random_forest": {
+    "held_out_test": {
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "f2": 1.0,
+      "auc": 1.0,
+      "tp": 60,
+      "tn": 340,
+      "fp": 0,
+      "fn": 0,
+      "total": 400
+    },
+    "cross_validation_5fold": {
+      "mean": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f2": 1.0,
+        "auc": 1.0
+      },
+      "std": {
+        "accuracy": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "f2": 0.0,
+        "auc": 0.0
+      }
+    }
+  },
+  "isolation_forest": {
+    "held_out_test": {
+      "accuracy": 0.8625,
+      "precision": 0.5243,
+      "recall": 0.9,
+      "f1": 0.6626,
+      "f2": 0.7872,
+      "auc": 0.9598,
+      "tp": 54,
+      "tn": 291,
+      "fp": 49,
+      "fn": 6,
+      "total": 400
+    }
+  },
+  "per_attack_type_rf": {
+    "normal": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "tn": 340,
+      "total": 340
+    },
+    "credential_stuffing": {
+      "tp": 13,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "total": 13
+    },
+    "account_takeover": {
+      "tp": 7,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "total": 7
+    },
+    "scanning": {
+      "tp": 12,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "total": 12
+    },
+    "financial_fraud": {
+      "tp": 8,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "total": 8
+    },
+    "brute_force": {
+      "tp": 20,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "total": 20
+    }
+  }
+}

@@ -1,0 +1,47 @@
+GATE80 Training Report — 20260424_213217
+Input: dataset/final/output/sessions_20260424_213151.csv
+Sessions: 500 total | 435 normal | 65 abnormal
+
+Isolation Forest
+  Precision : 0.5714
+  Recall    : 0.6154
+  F1        : 0.5926
+
+Random Forest
+  Precision : 0.8125
+  Recall    : 1.0000
+  F1        : 0.8966
+  FPR       : 0.0345
+
+5-Fold CV F1: 0.9920 ± 0.0160
+
+Per-attack-type:
+  credential_attack         P=1.000  R=1.000  F1=1.000
+  financial_fraud           P=1.000  R=1.000  F1=1.000
+  endpoint_scanning         P=1.000  R=1.000  F1=1.000
+  account_creation          P=1.000  R=1.000  F1=1.000
+
+Top 10 features:
+  min_think_time_ms              0.2082
+  http_4xx_ratio                 0.0933
+  error_count                    0.0909
+  total_requests                 0.0855
+  error_ratio                    0.0643
+  wallet_action_ratio            0.0633
+  avg_think_time_ms              0.0594
+  endpoint_entropy               0.0583
+  unique_endpoints               0.0311
+  avg_response_time_ms           0.0296
+
+Confusion Matrix:
+  TN=84  FP=3  FN=0  TP=13
+
+Full classification report (RF):
+              precision    recall  f1-score   support
+
+      normal       1.00      0.97      0.98        87
+    abnormal       0.81      1.00      0.90        13
+
+    accuracy                           0.97       100
+   macro avg       0.91      0.98      0.94       100
+weighted avg       0.98      0.97      0.97       100
