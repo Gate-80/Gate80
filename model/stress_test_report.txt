@@ -1,0 +1,30 @@
+GATE80 Stress Test Evaluation Report
+Input: dataset/final/output/sessions_20260424_224554.csv
+Sessions: 100 | Normal: 87 | Abnormal: 13
+
+Random Forest
+  Precision : 0.9286
+  Recall    : 1.0000
+  F1        : 0.9630
+  FPR       : 0.0115
+
+Isolation Forest
+  Precision : 0.8333
+  Recall    : 0.7692
+  F1        : 0.8000
+
+Per-attack-type (RF):
+  credential_attack         P=1.000  R=1.000  F1=1.000  (n=5)
+  financial_fraud           P=1.000  R=1.000  F1=1.000  (n=4)
+  endpoint_scanning         P=1.000  R=1.000  F1=1.000  (n=3)
+  account_creation          P=1.000  R=1.000  F1=1.000  (n=1)
+
+Full classification report:
+              precision    recall  f1-score   support
+
+      normal       1.00      0.99      0.99        87
+    abnormal       0.93      1.00      0.96        13
+
+    accuracy                           0.99       100
+   macro avg       0.96      0.99      0.98       100
+weighted avg       0.99      0.99      0.99       100
