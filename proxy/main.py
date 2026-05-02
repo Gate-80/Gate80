@@ -40,6 +40,10 @@ from detection.model import AnomalyDetector
 from proxy.behaviour_class import (
     SessionWindow, RequestSignal, classify_behavior, BEHAVIOR_WINDOW_SIZE
 )
+from adaptivedecoy.schemas import SessionSummary, Signals, TargetContext
+from adaptivedecoy.decoy_policy import choose_decoy_plan, build_llm_payload
+from adaptivedecoy.decoy_handler import apply_decoy_plan
+import json
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Logging
@@ -56,7 +60,7 @@ logger = logging.getLogger("proxy")
 # ─────────────────────────────────────────────────────────────────────────────
 BACKEND_URL  = os.getenv("BACKEND_URL",  "http://127.0.0.1:8000")
 DECOY_URL    = os.getenv("DECOY_URL",    "http://127.0.0.1:8001")
-MODEL_PATH   = os.getenv("MODEL_PATH",   "model/isolation_forest.pkl")
+MODEL_PATH   = os.getenv("MODEL_PATH",   "model/random_forest.pkl")
 SCALER_PATH  = os.getenv("SCALER_PATH",  "model/scaler.pkl")
 
 BACKEND_DB_PATH = os.getenv("BACKEND_DB_PATH", "digital_wallet.db")
@@ -92,7 +96,7 @@ _backend_session_factory = None
 _decoy_session_factory   = None
 
 # Sliding windows tracked for ALL sessions — built before flagging
-session_windows: dict[str, SessionWindow] = {}
+session_windows: dict[str, "SessionWindow"] = {}
 
 
 def get_or_create_window(sid: str) -> SessionWindow:
@@ -311,7 +315,91 @@ def _reclassify(window: SessionWindow, sid: str) -> None:
         )
         window.attack_type = new_type
 
+def build_session_summary(sid: str, window: SessionWindow) -> SessionSummary:
+    requests = getattr(window, "requests", [])
 
+    total_requests = len(requests)
+
+    if total_requests >= 2:
+        duration_sec = max(
+            requests[-1].timestamp - requests[0].timestamp,
+            1e-6
+        )
+    else:
+        duration_sec = 1.0
+
+    request_rate = total_requests / duration_sec
+
+    paths = [r.path for r in requests]
+    unique_endpoints = len(set(paths)) if paths else 0
+
+    status_codes = [r.status_code for r in requests]
+    failed_auth_count = sum(1 for s in status_codes if s in {401, 403})
+    status_404_count = sum(1 for s in status_codes if s == 404)
+
+    failed_auth_ratio = failed_auth_count / max(total_requests, 1)
+    status_404_ratio = status_404_count / max(total_requests, 1)
+
+    methods = [
+        getattr(r, "method", None)
+        for r in requests
+        if getattr(r, "method", None)
+    ]
+    method_diversity = len(set(methods)) if methods else 1
+
+    from collections import Counter
+    import math
+
+    counts = Counter(paths)
+    endpoint_entropy = 0.0
+    for count in counts.values():
+        p = count / max(total_requests, 1)
+        if p > 0:
+            endpoint_entropy -= p * math.log2(p)
+
+    attack_type_map = {
+        "brute_force": "credential_based_attacks",
+        "credential_stuffing": "credential_based_attacks",
+        "credential_attack": "credential_based_attacks",
+        "credential_based_attacks": "credential_based_attacks",
+
+        "scanning": "endpoint_scanning",
+        "endpoint_scanning": "endpoint_scanning",
+
+        "fraud": "financial_fraud",
+        "financial_fraud": "financial_fraud",
+
+        "account_creation": "account_creation",
+
+        "unknown_suspicious": "endpoint_scanning",
+        None: "credential_based_attacks",
+    }
+
+    raw_attack_type = getattr(window, "attack_type", None)
+    candidate_attack_type = attack_type_map.get(
+        raw_attack_type,
+        "credential_based_attacks"
+    )
+
+    return SessionSummary(
+        session_id=sid,
+        candidate_attack_type=candidate_attack_type,
+        signals=Signals(
+            request_rate=request_rate,
+            endpoint_entropy=endpoint_entropy,
+            unique_endpoints=unique_endpoints,
+            failed_auth_ratio=failed_auth_ratio,
+            status_404_ratio=status_404_ratio,
+            method_diversity=method_diversity,
+        ),
+        target_context=TargetContext(
+            business_flow_targeted=False,
+            authenticated=request_token_present(sid),
+        ),
+    )
+
+def request_token_present(sid: str) -> bool:
+    return sid.startswith("user:") or sid.startswith("admin:")
 # ─────────────────────────────────────────────────────────────────────────────
 # Middleware — console logging
 # ─────────────────────────────────────────────────────────────────────────────
@@ -336,17 +424,31 @@ async def log_requests(request: Request, call_next):
     "/{path:path}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
 )
+
 async def reverse_proxy(request: Request, path: str):
     req_id     = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     start_time = time.time()
     client_ip  = get_client_ip(request)
     sid        = get_session_id(request)
 
+    window = get_or_create_window(sid)
+
     body     = await request.body()
     body_str = body.decode("utf-8", errors="ignore") if body else None
     db       = SessionLocal()
 
-    window = get_or_create_window(sid)
+        # Control-plane routes should not affect detection state
+    if path.startswith("api/v1/onboarding"):
+        try:
+            upstream = await forward(request, body, f"{BACKEND_URL}/{path}")
+            return Response(
+                content=upstream.content,
+                status_code=upstream.status_code,
+                headers=dict(upstream.headers),
+            )
+        finally:
+            db.close()
+
     last_signal_time = window.requests[-1].timestamp if window.requests else start_time
     think_time_ms = (start_time - last_signal_time) * 1000
 
@@ -395,9 +497,10 @@ async def reverse_proxy(request: Request, path: str):
         state = detector.get_or_create_session(sid)
         pre_flagged = state.is_anomalous
 
+
     try:
         # ─────────────────────────────────────────────────────────────────────
-        # Branch A: session already flagged → forward to decoy
+        # Branch A: session already flagged → adaptive decoy inside proxy
         # ─────────────────────────────────────────────────────────────────────
         if pre_flagged:
             try:
@@ -412,45 +515,71 @@ async def reverse_proxy(request: Request, path: str):
                 )
                 response_time_ms = int((time.time() - start_time) * 1000)
 
-                # Add to window AFTER forwarding so status code is real
+                session_summary = build_session_summary(sid, window)
+
+                decoy_plan = choose_decoy_plan(
+                    session=session_summary,
+                    llm_raw_response=None,  # Gemini later
+                )
+
+                decoy_response = apply_decoy_plan(
+                    plan=decoy_plan,
+                    session=session_summary,
+                    request_path=request.url.path,
+                    request_method=request.method,
+                )
+
+                think_time_ms = 0
                 window.add(RequestSignal(
                     timestamp=start_time,
                     path=request.url.path,
-                    status_code=upstream.status_code,
+                    status_code=decoy_response["status_code"],
                     think_time_ms=think_time_ms,
                 ))
 
-                _, score = detector.process_request(
-                    sid, request.url.path,
-                    upstream.status_code, response_time_ms,
-                )
+                if detector is not None:
+                    _, score = detector.process_request(
+                        sid,
+                        request.url.path,
+                        decoy_response["status_code"],
+                        response_time_ms,
+                    )
+                else:
+                    score = 0.0
 
-                logger.info(
-                    "GATE80 🔀 [DECOY]   sid=%-40s score=%.4f  "
-                    "attack_type=%-20s  %s %s → %d",
-                    sid, score, window.attack_type,
-                    request.method, request.url.path, upstream.status_code,
+                    logger.info(
+                    "GATE80 🎭 [ADAPTIVE DECOY] sid=%-40s score=%.4f "
+                    "attack_type=%s strategy=%s depth=%s %s %s → %d",
+                    sid,
+                    score,
+                    window.attack_type,
+                    decoy_plan.strategy,
+                    decoy_plan.decoy_depth,
+                    request.method,
+                    request.url.path,
+                    decoy_response["status_code"],
                 )
 
                 db_log(
                     db, req_id, client_ip, request, body_str,
-                    upstream.status_code, response_time_ms,
+                    decoy_response["status_code"], response_time_ms,
                     forwarded_to_backend=False,
                     session_id=sid,
                     anomaly_score=score,
-                    routed_to="decoy",
+                    routed_to="adaptive_decoy",
                     flagged_as_suspicious=True,
-                    suspicion_reason=f"IF score={score:.4f}",
+                    suspicion_reason=f"Adaptive decoy: {decoy_plan.strategy}",
                     attack_type=window.attack_type,
                 )
 
                 return Response(
-                    content=upstream.content,
-                    status_code=upstream.status_code,
-                    headers=dict(upstream.headers),
+                    content=json.dumps(decoy_response["body"]).encode("utf-8"),
+                    status_code=decoy_response["status_code"],
+                    headers=decoy_response["headers"],
+                    media_type="application/json",
                 )
 
-            except (httpx.ConnectError, httpx.TimeoutException) as exc:
+            except Exception as exc:
                 response_time_ms = int((time.time() - start_time) * 1000)
                 error_msg = (
                     "Decoy unavailable"
@@ -458,19 +587,20 @@ async def reverse_proxy(request: Request, path: str):
                     else "Decoy timeout"
                 )
                 logger.warning("GATE80 ⚠️  decoy unreachable: %s", exc)
+                logger.error("GATE80 ❌ adaptive decoy failed: %s", exc)
 
                 db_log(
                     db, req_id, client_ip, request, body_str,
                     503, response_time_ms,
                     forwarded_to_backend=False,
-                    backend_error=error_msg,
+                    backend_error=f"Adaptive decoy failure: {exc}",
                     session_id=sid,
                     routed_to="error",
                     attack_type=window.attack_type,
                 )
 
                 return Response(
-                    content=b'{"detail": "Service unavailable"}',
+                    content=b'{"detail": "Adaptive decoy unavailable"}',
                     status_code=503,
                     headers={"Content-Type": "application/json"},
                 )
@@ -483,7 +613,7 @@ async def reverse_proxy(request: Request, path: str):
                 upstream = await forward(request, body, f"{BACKEND_URL}/{path}")
                 response_time_ms = int((time.time() - start_time) * 1000)
 
-                # Add to window with real status code
+                think_time_ms = 0
                 window.add(RequestSignal(
                     timestamp=start_time,
                     path=request.url.path,
@@ -499,7 +629,9 @@ async def reverse_proxy(request: Request, path: str):
                 else:
                     is_anomalous, score = False, 0.0
 
-                attack_type = None
+                
+
+                attack_type = window.attack_type
 
                 if is_anomalous:
                     # Classify immediately — cumulative layer has been
@@ -510,12 +642,13 @@ async def reverse_proxy(request: Request, path: str):
                     token = request.headers.get("X-User-Token")
                     if token:
                         mirror_token_to_decoy(token)
-
-                    logger.warning(
-                        "GATE80 🚨 [FLAGGED]  sid=%-40s score=%.4f  "
-                        "attack_type=%s  → next requests → decoy",
-                        sid, score, attack_type,
-                    )
+                        logger.warning(
+                         "GATE80 🚨 [FLAGGED] sid=%-40s score=%.4f attack_type=%s "
+                           "→ next requests → adaptive decoy",
+                         sid,
+                         score,
+                         attack_type,
+                                         )
                 else:
                     logger.info(
                         "GATE80 ✅ [BACKEND]  sid=%-40s score=%.4f  "

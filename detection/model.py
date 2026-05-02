@@ -160,11 +160,17 @@ class AnomalyDetector:
         logger.info("GATE80 ▶ loading scaler : %s", scaler_path)
         self.scaler = joblib.load(scaler_path)
 
-        logger.info(
-            "GATE80 ✅ detector ready — %d estimators, contamination=%.2f",
-            self.model.n_estimators,
-            self.model.contamination,
-        )
+        if hasattr(self.model, "contamination"):
+          logger.info(
+           "GATE80 ✅ Isolation Forest detector ready — %d estimators, contamination=%.2f",
+           self.model.n_estimators,
+           self.model.contamination,
+                         )
+        else:
+          logger.info(
+          "GATE80 ✅ Random Forest detector ready — %d estimators",
+          self.model.n_estimators,
+           )
         logger.info(
             "GATE80 ✅ thresholds — min_requests=%d, score_threshold=%.3f",
             MIN_REQUESTS_BEFORE_SCORING,
@@ -256,9 +262,17 @@ class AnomalyDetector:
 
             vec = _build_feature_vector(s)
             x = pd.DataFrame([vec], columns=FEATURE_NAMES)
-            x_scaled = self.scaler.transform(x)
-            raw_score = float(self.model.decision_function(x_scaled)[0])
-            is_anomalous = raw_score < ANOMALY_SCORE_THRESHOLD
+            # Random Forest path
+            if hasattr(self.model, "predict_proba"):
+             anomaly_prob = float(self.model.predict_proba(x)[0][1])
+             raw_score = anomaly_prob
+             is_anomalous = anomaly_prob >= 0.55
+
+            # Isolation Forest fallback
+            else:
+              x_scaled = self.scaler.transform(x)
+              raw_score = float(self.model.decision_function(x_scaled)[0])
+              is_anomalous = raw_score < ANOMALY_SCORE_THRESHOLD
 
         with self._lock:
             s = self._sessions.get(session_id)
