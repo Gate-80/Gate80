@@ -1,4 +1,4 @@
-# run_all.ps1
+﻿# run_all.ps1
 # Windows equivalent of run_all.sh for GATE80 project
 # Generic - works for any team member on Windows
 # Run from the project root: .\run_all.ps1

@@ -29,6 +29,7 @@ import time
 import uuid
 import logging
 import httpx
+import asyncio
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from sqlalchemy import create_engine, text
@@ -400,6 +401,40 @@ def build_session_summary(sid: str, window: SessionWindow) -> SessionSummary:
 
 def request_token_present(sid: str) -> bool:
     return sid.startswith("user:") or sid.startswith("admin:")
+
+def get_configured_decoy(path: str, method: str):
+    """
+    Check if this path+method has a configured decoy in the backend DB.
+    Returns the decoy_config row as a dict, or None if not found.
+    """
+    if not _backend_session_factory:
+        return None
+    try:
+        db = _backend_session_factory()
+        result = db.execute(
+            text("""
+                SELECT dc.status_code, dc.response_template, dc.delay_ms, dc.decoy_type
+                FROM decoy_config dc
+                JOIN endpoint_inventory ei ON dc.endpoint_id = ei.id
+                WHERE ei.path = :path
+                  AND ei.method = :method
+                  AND ei.is_selected_for_decoy = 1
+                  AND dc.is_enabled = 1
+                LIMIT 1
+            """),
+            {"path": path, "method": method.upper()}
+        ).fetchone()
+        db.close()
+        if result:
+            return {
+                "status_code": int(result[0] or 200),
+                "body": result[1] or {"message": "OK"},
+                "delay_ms": int(result[2] or 0),
+                "decoy_type": result[3],
+            }
+    except Exception as e:
+        logger.error("GATE80 ❌ decoy config lookup failed: %s", e)
+    return None
 # ─────────────────────────────────────────────────────────────────────────────
 # Middleware — console logging
 # ─────────────────────────────────────────────────────────────────────────────
@@ -508,15 +543,37 @@ async def reverse_proxy(request: Request, path: str):
                 # handles both early (cumulative) and late (window) signals
                 _reclassify(window, sid)
 
+                response_time_ms = int((time.time() - start_time) * 1000)
+                session_summary = build_session_summary(sid, window)
+
+                # Check if this endpoint has a configured decoy in the DB
+                configured = get_configured_decoy(request.url.path, request.method)
+                if configured:
+                    if configured["delay_ms"] > 0:
+                         await asyncio.sleep(configured["delay_ms"] / 1000)
+                    db_log(
+                        db, req_id, client_ip, request, body_str,
+                        configured["status_code"], response_time_ms,
+                        forwarded_to_backend=False,
+                        session_id=sid,
+                        anomaly_score=0.0,
+                        routed_to="configured_decoy",
+                        flagged_as_suspicious=True,
+                        suspicion_reason=f"Configured decoy: {configured['decoy_type']}",
+                        attack_type=window.attack_type,
+                    )
+                    return Response(
+                        content=json.dumps(configured["body"]).encode("utf-8"),
+                        status_code=configured["status_code"],
+                        headers={"Content-Type": "application/json"},
+                    )
+
                 upstream = await forward(
                     request, body,
                     f"{DECOY_URL}/{path}",
                     extra_headers={"X-Attack-Type": window.attack_type},
                 )
-                response_time_ms = int((time.time() - start_time) * 1000)
-
-                session_summary = build_session_summary(sid, window)
-
+                
                 decoy_plan = choose_decoy_plan(
                     session=session_summary,
                     llm_raw_response=None,  # Gemini later
