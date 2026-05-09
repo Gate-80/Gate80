@@ -18,8 +18,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from backend_api.db.database import get_db
-from backend_api.db.models import User
-from gate80_platform.db.models import Project, EndpointInventory, DecoyConfig, ProxyConfig
+from backend_api.db.models import Project, EndpointInventory, DecoyConfig, ProxyConfig, User
 from backend_api.decoy_generator import generate_decoy_for_endpoint
 from backend_api.openapi_parser import load_openapi_document, parse_openapi_endpoints
 from backend_api.risk_score_api import score_endpoint

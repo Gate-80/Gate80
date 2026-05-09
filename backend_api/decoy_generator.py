@@ -1,15 +1,24 @@
+"""Heuristic decoy-config generator for endpoints in the customer's API spec.
+
+Each call returns a deterministic decoy configuration based on the endpoint's
+method, path, tag, and summary. Used during onboarding to seed `decoy_config`
+rows alongside the corresponding `endpoint_inventory` rows.
+"""
 from __future__ import annotations
 
 from typing import Any
 
-from backend_api.db.models import EndpointInventory
+# Phase 1B: EndpointInventory now lives in the platform DB package.
+from gate80_platform.db.models import EndpointInventory
 
 
 def _target(endpoint: EndpointInventory) -> str:
+    """Build a single lowercase string for keyword matching."""
     return f"{endpoint.method or ''} {endpoint.path or ''} {endpoint.tag or ''} {endpoint.summary or ''}".lower()
 
 
 def generate_decoy_for_endpoint(endpoint: EndpointInventory) -> dict[str, Any]:
+    """Return a decoy-config dict for the given endpoint."""
     target = _target(endpoint)
     method = (endpoint.method or "GET").upper()
 

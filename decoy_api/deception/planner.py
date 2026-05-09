@@ -1,51 +1,98 @@
+"""
+GATE80 — Decoy API
+deception/planner.py
+
+Generates a tiny "deception plan" (status code override + a few specific JSON
+fields + optional 'did_you_mean' suggestions) per request. Every output is
+validated against ATTACK_TYPE_RULES — anything outside the allowlist is
+rejected so the LLM cannot leak invented fields into the response.
+
+Phase 7: pluggable LLM backends (anthropic / local / gemini)
+Phase 8: Swagger-driven prompts
+  - Looks up the customer's response schema for (path, method) in
+    endpoint_inventory and includes it in the prompt so generated values
+    match the customer's API contract.
+  - For paths NOT in inventory: skip LLM and let the deterministic
+    strategy + fallback handle the response (matches Bridges et al. SoK
+    canonical hybrid architecture).
+"""
+from __future__ import annotations
+
 import json
 import logging
 import os
 import uuid
+from pathlib import Path
 from typing import Any, Literal
 
-import httpx
 from pydantic import BaseModel, Field, ValidationError
+
+from decoy_api.deception.backends.base import BaseDeceptionBackend
+from decoy_api.platform_lookup import get_response_schema, scrub_schema
+
 
 logger = logging.getLogger("decoy.deception.planner")
 
-GEMINI_API_URL = (
-    "https://generativelanguage.googleapis.com/{api_version}/models/"
-    "{model}:generateContent?key={api_key}"
-)
-DEFAULT_GEMINI_API_VERSION = os.getenv("GEMINI_API_VERSION", "v1")
-DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-PROMPT_VERSION = "gemini-plan-v1"
+PROMPT_VERSION = "plan-v4"   # bumped: schema-aware
 MAX_RESPONSE_BODY_PREVIEW = 2_000
 MAX_REQUEST_BODY_PREVIEW = 1_000
+MAX_SCHEMA_PROMPT_CHARS = 3_000   # cap schema size in prompt
+MAX_SUGGESTIONS = 8
+
+
+def _load_env_file(path: str = "apikey.env") -> None:
+    p = Path(path)
+    if not p.exists():
+        return
+    try:
+        for line in p.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+    except OSError:
+        pass
+
+
+_load_env_file()
+
 
 ATTACK_TYPE_RULES = {
-    "brute_force": {
+    "credential_based_attacks": {
         "status_codes": {423},
         "string_fields": {"detail", "support"},
-        "int_fields": {"retry_after", "lock_level"},
+        "int_fields":    {"retry_after", "lock_level"},
         "allow_suggestions": False,
     },
-    "scanning": {
+    "endpoint_scanning": {
         "status_codes": {404, 429},
         "string_fields": {"detail", "docs"},
-        "int_fields": {"retry_after", "limit_level"},
+        "int_fields":    {"retry_after", "limit_level"},
         "allow_suggestions": True,
     },
-    "fraud": {
+    "financial_fraud": {
         "status_codes": {202},
         "string_fields": {"message", "status"},
-        "int_fields": set(),
+        "int_fields":    set(),
+        "allow_suggestions": False,
+    },
+    "account_creation": {
+        "status_codes": {201, 429},
+        "string_fields": {"verification_status", "verification_message", "throttle_warning"},
+        "int_fields":    {"retry_after"},
         "allow_suggestions": False,
     },
     "unknown_suspicious": {
         "status_codes": set(),
         "string_fields": set(),
-        "int_fields": set(),
+        "int_fields":    set(),
         "allow_suggestions": False,
     },
 }
-MAX_SUGGESTIONS = 8
 
 
 class DeceptionPlan(BaseModel):
@@ -71,9 +118,10 @@ class PlanContext(BaseModel):
 
 
 class PlanGenerationResult(BaseModel):
-    source: Literal["gemini", "fallback", "error"]
+    source: Literal["llm", "fallback", "error", "skipped"]
     model_name: str | None = None
     prompt_version: str = PROMPT_VERSION
+    prompt: str | None = None
     plan: DeceptionPlan
     raw_plan: dict[str, Any] | None = None
     error_message: str | None = None
@@ -86,78 +134,88 @@ class PlanApplicationResult(BaseModel):
     final_body_preview: str | None = None
 
 
-class GeminiDeceptionPlanner:
+def _select_backend() -> BaseDeceptionBackend | None:
+    choice = os.getenv("GATE80_LLM_BACKEND", "anthropic").strip().lower()
+
+    try:
+        if choice == "anthropic":
+            from decoy_api.deception.backends.anthropic_backend import AnthropicBackend
+            backend = AnthropicBackend()
+        elif choice == "local":
+            from decoy_api.deception.backends.local_llama_backend import LocalLlamaBackend
+            backend = LocalLlamaBackend()
+        elif choice == "gemini":
+            from decoy_api.deception.backends.gemini_backend import GeminiBackend
+            backend = GeminiBackend()
+        else:
+            logger.warning("Unknown GATE80_LLM_BACKEND=%r, falling back to deterministic only", choice)
+            return None
+
+        logger.info("DECOY [PLANNER] backend=%s model=%s", choice, backend.name)
+        return backend
+    except Exception as exc:
+        logger.error("DECOY [PLANNER] failed to initialise backend %r: %s", choice, exc)
+        return None
+
+
+class DeceptionPlanner:
+
     def __init__(self) -> None:
-        self._api_key = os.getenv("GEMINI_API_KEY")
-        self._api_version = DEFAULT_GEMINI_API_VERSION
-        self._model = DEFAULT_GEMINI_MODEL
+        self._backend: BaseDeceptionBackend | None = _select_backend()
+
+    @property
+    def backend_name(self) -> str:
+        return self._backend.name if self._backend else "deterministic-only"
 
     async def generate_plan(self, context: PlanContext) -> PlanGenerationResult:
-        if not self._api_key:
-            return self._fallback_result(context, "GEMINI_API_KEY not configured")
+        if self._backend is None:
+            return self._fallback_result(context, "no LLM backend configured")
 
-        prompt = self._build_prompt(context)
-        payload = {
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.2,
-            },
-        }
+        # Phase 8: look up the customer's response schema. Endpoints not in
+        # inventory (attacker probing /.env, /admin/debug, etc.) skip the LLM
+        # and let the deterministic strategy handle them.
+        schema = get_response_schema(context.path, context.method)
+        if schema is None:
+            return self._fallback_result(
+                context,
+                "endpoint not in inventory; deterministic-only",
+            )
+
+        scrubbed = scrub_schema(schema)
+        prompt = self._build_prompt(context, scrubbed)
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post(
-                    GEMINI_API_URL.format(
-                        api_version=self._api_version,
-                        model=self._model,
-                        api_key=self._api_key,
-                    ),
-                    json=payload,
-                )
-                response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            error_body = exc.response.text.strip()
-            error_message = str(exc)
-            if error_body:
-                error_message = f"{error_message} | body={error_body}"
-            logger.warning("Gemini plan generation failed for %s: %s", context.request_id, error_message)
-            return self._fallback_result(context, error_message)
+            raw_text = await self._backend.generate_raw(prompt)
         except Exception as exc:
-            logger.warning("Gemini plan generation failed for %s: %s", context.request_id, exc)
-            return self._fallback_result(context, str(exc))
+            logger.warning(
+                "DECOY [PLANNER] backend=%s failed for %s: %s",
+                self._backend.name, context.request_id, exc,
+            )
+            return self._fallback_result(context, f"{self._backend.name}: {exc}", prompt=prompt)
 
         try:
-            raw_payload = response.json()
-            raw_text = self._extract_text(raw_payload)
-            raw_plan = json.loads(_normalize_gemini_json(raw_text))
+            normalised = _normalize_llm_json(raw_text)
+            raw_plan = json.loads(normalised)
             if isinstance(raw_plan.get("set_fields"), dict):
                 raw_plan["set_fields"] = {
-                    key: value
-                    for key, value in raw_plan["set_fields"].items()
-                    if value is not None
+                    k: v for k, v in raw_plan["set_fields"].items() if v is not None
                 }
             plan = DeceptionPlan.model_validate(raw_plan)
             return PlanGenerationResult(
-                source="gemini",
-                model_name=self._model,
+                source="llm",
+                model_name=self._backend.name,
+                prompt=prompt,
                 plan=plan,
                 raw_plan=raw_plan,
             )
         except (ValueError, KeyError, ValidationError) as exc:
-            raw_preview = None
-            try:
-                raw_preview = locals().get("raw_text")
-            except Exception:
-                raw_preview = None
-
-            error_message = f"invalid_gemini_plan: {exc}"
-            if raw_preview is not None:
-                error_message = (
-                    f"{error_message} | raw_text={_truncate_preview(str(raw_preview), 1000)}"
-                )
-
-            logger.warning("Gemini returned invalid plan for %s: %s", context.request_id, error_message)
-            return self._fallback_result(context, error_message)
+            preview = _truncate_preview(str(raw_text), 1000)
+            err = f"invalid_llm_plan: {exc} | raw_text={preview}"
+            logger.warning(
+                "DECOY [PLANNER] %s returned invalid plan for %s: %s",
+                self._backend.name, context.request_id, err,
+            )
+            return self._fallback_result(context, err, prompt=prompt)
 
     def apply_plan(
         self,
@@ -228,30 +286,28 @@ class GeminiDeceptionPlanner:
         result.final_body_preview = _truncate_preview(body.decode("utf-8", errors="ignore"))
         return body, status_code, result
 
-    def _apply_field(
-        self,
-        data: dict[str, Any],
-        field_name: str,
-        value: Any,
-        rules: dict[str, Any],
-    ) -> str:
+    def _apply_field(self, data, field_name, value, rules):
         if field_name in rules["string_fields"]:
             data[field_name] = str(value)
             return f"applied:{field_name}"
-
         if field_name in rules["int_fields"]:
             try:
                 data[field_name] = int(value)
                 return f"applied:{field_name}"
             except (TypeError, ValueError):
                 return f"rejected:{field_name}=invalid_int"
-
         return f"rejected:{field_name}=not_allowlisted"
 
-    def _fallback_result(self, context: PlanContext, reason: str) -> PlanGenerationResult:
+    def _fallback_result(
+        self,
+        context: PlanContext,
+        reason: str,
+        prompt: str | None = None,
+    ) -> PlanGenerationResult:
         return PlanGenerationResult(
             source="fallback",
             model_name="local-fallback",
+            prompt=prompt,
             plan=self._fallback_plan(context),
             error_message=reason,
         )
@@ -260,22 +316,25 @@ class GeminiDeceptionPlanner:
         set_fields: dict[str, Any] = {}
         suggestions: list[str] = []
 
-        if context.attack_type == "scanning" and context.response_status == 404:
-            set_fields = {
-                "detail": "Resource not found",
-                "docs": "/api/v1/docs",
-            }
+        if context.attack_type == "endpoint_scanning" and context.response_status == 404:
+            set_fields = {"detail": "Resource not found", "docs": "/api/v1/docs"}
             suggestions = _fallback_ghost_suggestions(context.path)
-        elif context.attack_type == "fraud" and any(
-            segment in context.path for segment in ("/transfer", "/withdraw", "/pay-bill", "/topup")
+
+        elif context.attack_type == "financial_fraud" and any(
+            seg in context.path for seg in ("/transfer", "/withdraw", "/pay-bill", "/topup")
         ):
             set_fields = {
                 "message": "Transaction submitted for compliance review",
-                "status": "PENDING_REVIEW",
+                "status":  "PENDING_REVIEW",
             }
-        elif context.attack_type == "brute_force" and "/auth/sign-in" in context.path:
+
+        elif context.attack_type == "credential_based_attacks" and "/auth/sign-in" in context.path:
+            set_fields = {"support": "contact support@digitalwallet.sa for assistance"}
+
+        elif context.attack_type == "account_creation" and "/auth/sign-up" in context.path:
             set_fields = {
-                "support": "contact support@digitalwallet.sa for assistance",
+                "verification_status":  "pending_email_verification",
+                "verification_message": "A verification link has been sent to your email.",
             }
 
         return DeceptionPlan(
@@ -285,9 +344,22 @@ class GeminiDeceptionPlanner:
             add_suggestions=suggestions,
         )
 
-    def _build_prompt(self, context: PlanContext) -> str:
+    def _build_prompt(self, context: PlanContext, schema: dict | None = None) -> str:
         safe_request_body = _truncate_preview(context.request_body, MAX_REQUEST_BODY_PREVIEW)
         response_preview = _truncate_preview(context.response_body_preview, MAX_RESPONSE_BODY_PREVIEW)
+
+        # Phase 8: include scrubbed response schema if available.
+        schema_section = ""
+        if schema is not None:
+            schema_text = json.dumps(schema, ensure_ascii=True)
+            if len(schema_text) > MAX_SCHEMA_PROMPT_CHARS:
+                schema_text = schema_text[:MAX_SCHEMA_PROMPT_CHARS] + "...[truncated]"
+            schema_section = (
+                f"\nCustomer API response schema for this endpoint (use as a guide for "
+                f"generating realistic values; respect type, format, and pattern):\n"
+                f"{schema_text}\n"
+            )
+
         return f"""
 You are generating a deception plan for an adaptive API decoy.
 
@@ -303,6 +375,9 @@ Return only valid JSON with this exact shape:
     "status": "string",
     "support": "string",
     "docs": "string",
+    "verification_status": "string",
+    "verification_message": "string",
+    "throttle_warning": "string",
     "retry_after": 60,
     "limit_level": 1,
     "lock_level": 1
@@ -316,11 +391,13 @@ Rules:
 - Do not invent new top-level keys.
 - If no change is needed, return null for status_code and empty objects/lists.
 - Make the plan believable for an attacker and consistent with the attack_type.
-
+- Where the customer schema specifies a type, format, or pattern, generated values must match it.
+{schema_section}
 Attack-type-specific rules:
-- brute_force: status_code only 423; set_fields only detail, support, retry_after, lock_level; add_suggestions must stay empty
-- scanning: status_code only 404 or 429; set_fields only detail, docs, retry_after, limit_level; add_suggestions allowed
-- fraud: status_code only 202; set_fields only message, status; add_suggestions must stay empty
+- credential_based_attacks: status_code only 423; set_fields only detail, support, retry_after, lock_level; add_suggestions must stay empty
+- endpoint_scanning: status_code only 404 or 429; set_fields only detail, docs, retry_after, limit_level; add_suggestions allowed
+- financial_fraud: status_code only 202; set_fields only message, status; add_suggestions must stay empty
+- account_creation: status_code only 201 or 429; set_fields only verification_status, verification_message, throttle_warning, retry_after; add_suggestions must stay empty
 - unknown_suspicious: status_code must be null; set_fields empty; add_suggestions empty
 
 Context:
@@ -336,20 +413,8 @@ Context:
 - response_body_preview: {response_preview or ""}
 """.strip()
 
-    @staticmethod
-    def _extract_text(payload: dict[str, Any]) -> str:
-        candidates = payload.get("candidates") or []
-        if not candidates:
-            raise KeyError("missing candidates")
-        parts = candidates[0]["content"]["parts"]
-        for part in parts:
-            text = part.get("text")
-            if text:
-                return text
-        raise KeyError("missing text part")
 
-
-def _truncate_preview(value: str | None, max_len: int = MAX_RESPONSE_BODY_PREVIEW) -> str | None:
+def _truncate_preview(value, max_len=MAX_RESPONSE_BODY_PREVIEW):
     if value is None:
         return None
     if len(value) <= max_len:
@@ -357,11 +422,7 @@ def _truncate_preview(value: str | None, max_len: int = MAX_RESPONSE_BODY_PREVIE
     return value[:max_len] + "...[truncated]"
 
 
-def _normalize_gemini_json(value: str) -> str:
-    """
-    Gemini often wraps JSON in markdown fences like ```json ... ```.
-    Strip those wrappers before attempting json.loads(...).
-    """
+def _normalize_llm_json(value: str) -> str:
     cleaned = value.strip()
     if cleaned.startswith("```"):
         lines = cleaned.splitlines()
@@ -391,3 +452,6 @@ def _fallback_ghost_suggestions(path: str) -> list[str]:
         "/api/v1/version",
         "/api/v1/health/detailed",
     ]
+
+
+GeminiDeceptionPlanner = DeceptionPlanner

@@ -1,6 +1,23 @@
-# SQLAlchemy models (tables)
+"""
+Wallet models.
 
-from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum, ForeignKey, Numeric, JSON
+Only contains tables that belong to a customer's digital wallet:
+users, wallets, transactions, payments, bank_accounts, audit_logs, admins,
+and the two session tables.
+
+The four platform tables (projects, endpoint_inventory, decoy_config,
+proxy_config) moved to gate80_platform.db in Phase 1. Code that needs them
+imports from gate80_platform.db.models directly.
+"""
+from sqlalchemy import (
+    Column,
+    String,
+    Boolean,
+    DateTime,
+    Enum as SQLEnum,
+    ForeignKey,
+    JSON,
+)
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 import enum
@@ -9,7 +26,7 @@ from backend_api.db.database import Base
 
 
 def now_utc():
-    """Helper function to get current UTC time"""
+    """Return current UTC time. Used as default for timestamp columns."""
     return datetime.now(timezone.utc)
 
 
@@ -49,24 +66,26 @@ class PaymentStatus(str, enum.Enum):
 # Models
 # -----------------------------
 class User(Base):
+    """Wallet end-user (the customer's customer)."""
     __tablename__ = "users"
 
     id = Column(String, primary_key=True, index=True)
     full_name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False, index=True)
-    password = Column(String, nullable=False)  # Stored as a salted password hash
+    password = Column(String, nullable=False)  # PBKDF2-SHA256 hash
     phone = Column(String, nullable=False)
     city = Column(String, nullable=False)
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=now_utc)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
-    # Relationships
+    # Wallet-side relationships only. The cross-DB User <-> Project relationship
+    # was removed; the User.id is referenced in projects.user_id as a plain string,
+    # validated at the application layer.
     bank_accounts = relationship("BankAccount", back_populates="user", cascade="all, delete-orphan")
     wallets = relationship("Wallet", back_populates="user", cascade="all, delete-orphan")
     transactions = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="user", cascade="all, delete-orphan")
-    projects = relationship("Project", back_populates="user", cascade="all, delete-orphan")
 
 
 class BankAccount(Base):
@@ -82,7 +101,6 @@ class BankAccount(Base):
     created_at = Column(DateTime(timezone=True), default=now_utc)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
-    # Relationships
     user = relationship("User", back_populates="bank_accounts")
 
 
@@ -92,12 +110,11 @@ class Wallet(Base):
     id = Column(String, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False, unique=True)
     currency_code = Column(String, default="SAR")
-    balance = Column(String, default="0.00")  # Store as string to maintain precision
+    balance = Column(String, default="0.00")  # String to preserve decimal precision
     status = Column(SQLEnum(WalletStatus), default=WalletStatus.ACTIVE)
     created_at = Column(DateTime(timezone=True), default=now_utc)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
-    # Relationships
     user = relationship("User", back_populates="wallets")
     transactions = relationship("Transaction", back_populates="wallet", cascade="all, delete-orphan")
 
@@ -110,13 +127,12 @@ class Transaction(Base):
     wallet_id = Column(String, ForeignKey("wallets.id"), nullable=False)
     type = Column(SQLEnum(TransactionType), nullable=False)
     status = Column(SQLEnum(TransactionStatus), default=TransactionStatus.PENDING)
-    amount = Column(JSON, nullable=False)  # Stored as {"currency_code": "SAR", "value": "100.00"}
-    counterparty = Column(JSON, nullable=False)  # Stored as {"kind": "USER", "ref": "u_1002"}
+    amount = Column(JSON, nullable=False)         # {"currency_code": "SAR", "value": "100.00"}
+    counterparty = Column(JSON, nullable=False)   # {"kind": "USER", "ref": "u_1002"}
     description = Column(String)
     created_at = Column(DateTime(timezone=True), default=now_utc)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
-    # Relationships
     user = relationship("User", back_populates="transactions")
     wallet = relationship("Wallet", back_populates="transactions")
 
@@ -127,22 +143,22 @@ class Payment(Base):
     id = Column(String, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     status = Column(SQLEnum(PaymentStatus), default=PaymentStatus.CREATED)
-    amount = Column(JSON, nullable=False)  # Stored as {"currency_code": "SAR", "value": "100.00"}
-    merchant = Column(JSON, nullable=False)  # Stored as {"name": "Store", "merchant_id": "m_9001"}
+    amount = Column(JSON, nullable=False)
+    merchant = Column(JSON, nullable=False)       # {"name": "Store", "merchant_id": "m_9001"}
     description = Column(String)
     created_at = Column(DateTime(timezone=True), default=now_utc)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
-    # Relationships
     user = relationship("User", back_populates="payments")
 
 
 class Admin(Base):
+    """Wallet admin user (the customer's admin)."""
     __tablename__ = "admins"
 
     id = Column(String, primary_key=True, index=True)
     username = Column(String, unique=True, nullable=False, index=True)
-    password = Column(String, nullable=False)  # Stored as a salted password hash
+    password = Column(String, nullable=False)
     role = Column(String, default="ADMIN")
     created_at = Column(DateTime(timezone=True), default=now_utc)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
@@ -166,130 +182,16 @@ class UserSession(Base):
 
 
 class AuditLog(Base):
+    """Wallet-side audit trail for state-changing actions."""
     __tablename__ = "audit_logs"
 
     id = Column(String, primary_key=True, index=True)
-    event = Column(String, nullable=False, index=True)  # e.g., "USER_TRANSFER", "ADMIN_VIEW_USERS", "USER_LOGIN"
-    actor_type = Column(String, nullable=False)  # "USER" or "ADMIN"
-    actor_id = Column(String, index=True)  # user_id or admin_id
-    resource_type = Column(String)  # "WALLET", "TRANSACTION", "USER", "BANK_ACCOUNT", etc.
-    resource_id = Column(String)  # ID of the affected resource
-    action_result = Column(String)  # "SUCCESS", "FAILED", "UNAUTHORIZED"
-    ip_address = Column(String)  # Client IP address (optional for now)
-    meta = Column(JSON)  # Additional context (amounts, counterparty, error messages, etc.)
+    event = Column(String, nullable=False, index=True)        # e.g. USER_TRANSFER, ADMIN_VIEW_USERS
+    actor_type = Column(String, nullable=False)               # USER | ADMIN
+    actor_id = Column(String, index=True)
+    resource_type = Column(String)                            # WALLET | TRANSACTION | USER | ...
+    resource_id = Column(String)
+    action_result = Column(String)                            # SUCCESS | FAILED | UNAUTHORIZED
+    ip_address = Column(String)
+    meta = Column(JSON)
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
-
-# -----------------------------
-# Onboarding / Decoy System Models
-# -----------------------------
-
-class Project(Base):
-    __tablename__ = "projects"
-
-    id = Column(String, primary_key=True, index=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
-    name = Column(String, nullable=False)
-    customer_name = Column(String, nullable=False)
-    environment = Column(String, default="Development")
-    source_type = Column(String, nullable=False)   # openapi_file | openapi_url | website_scan
-    source_value = Column(String, nullable=False)  # file path or URL
-    onboarding_status = Column(String, default="imported")
-    decoy_generation_status = Column(String, default="not_started")
-    created_at = Column(DateTime(timezone=True), default=now_utc)
-    updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
-
-    user = relationship("User", back_populates="projects")
-
-    endpoints = relationship(
-        "EndpointInventory",
-        back_populates="project",
-        cascade="all, delete-orphan"
-    )
-
-    decoy_configs = relationship(
-        "DecoyConfig",
-        back_populates="project",
-        cascade="all, delete-orphan"
-    )
-
-    proxy_configs = relationship(
-        "ProxyConfig",
-        back_populates="project",
-        cascade="all, delete-orphan"
-    )
-
-
-class EndpointInventory(Base):
-    __tablename__ = "endpoint_inventory"
-
-    id = Column(String, primary_key=True, index=True)
-    project_id = Column(String, ForeignKey("projects.id"), nullable=False)
-
-    path = Column(String, nullable=False)
-    method = Column(String, nullable=False)
-    summary = Column(String)
-    tag = Column(String)
-    requires_auth = Column(Boolean, default=False)
-
-    request_schema_json = Column(JSON)
-    response_schema_json = Column(JSON)
-
-    risk_score = Column(String, default="0")
-    risk_level = Column(String, default="low")
-
-    is_selected_for_decoy = Column(Boolean, default=False)
-    created_at = Column(DateTime(timezone=True), default=now_utc)
-
-    project = relationship("Project", back_populates="endpoints")
-
-    decoy_configs = relationship(
-        "DecoyConfig",
-        back_populates="endpoint",
-        cascade="all, delete-orphan"
-    )
-
-
-class DecoyConfig(Base):
-    __tablename__ = "decoy_config"
-
-    id = Column(String, primary_key=True, index=True)
-    project_id = Column(String, ForeignKey("projects.id"), nullable=False)
-    endpoint_id = Column(String, ForeignKey("endpoint_inventory.id"), nullable=False)
-    created_by_user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
-
-    name = Column(String)
-    description = Column(String)
-    decoy_type = Column(String, nullable=False)   # fake_success | fake_failure | delayed_response | honey_data
-    status_code = Column(String, default="200")
-    response_template = Column(JSON)
-    headers_template = Column(JSON)
-    trigger_condition = Column(JSON)
-    delay_ms = Column(String, default="0")
-    generation_source = Column(String, default="auto")
-    review_status = Column(String, default="draft")
-    is_enabled = Column(Boolean, default=True)
-
-    created_at = Column(DateTime(timezone=True), default=now_utc)
-    updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
-
-    project = relationship("Project", back_populates="decoy_configs")
-    endpoint = relationship("EndpointInventory", back_populates="decoy_configs")
-
-
-class ProxyConfig(Base):
-    __tablename__ = "proxy_config"
-
-    id = Column(String, primary_key=True, index=True)
-    project_id = Column(String, ForeignKey("projects.id"), nullable=False, index=True)
-
-    backend_base_url = Column(String, nullable=False)
-    proxy_host = Column(String, default="127.0.0.1")
-    listen_port = Column(String, default="8080")
-    api_key = Column(String)
-    mode = Column(String, default="reverse_proxy")
-    is_active = Column(Boolean, default=True)
-
-    created_at = Column(DateTime(timezone=True), default=now_utc)
-    updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
-
-    project = relationship("Project", back_populates="proxy_configs")

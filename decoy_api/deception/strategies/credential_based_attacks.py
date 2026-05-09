@@ -1,8 +1,12 @@
 """
 GATE80 — Decoy API
-deception/strategies/brute_force.py
+deception/strategies/credential_based_attacks.py
 
-Progressive lockout deception strategy for brute force sessions.
+Progressive lockout strategy for credential-based attack sessions.
+
+OWASP Mapping:
+  - OAT-007 (Credential Cracking) + OAT-008 (Credential Stuffing)
+  - API2:2023 Broken Authentication
 
 Lock durations (doubles each cycle, capped at 24h):
   Lock 1:  1,800s ( 30 min)
@@ -18,7 +22,7 @@ import time
 from fastapi import Request
 from decoy_api.deception.strategies.base import BaseStrategy
 
-logger = logging.getLogger("decoy.deception.brute_force")
+logger = logging.getLogger("decoy.deception.credential_based_attacks")
 
 AUTH_DELAY               = 2.5
 DEFAULT_DELAY            = 0.3
@@ -28,14 +32,11 @@ MAX_LOCK_SECONDS         = 86_400  # 24 hours
 
 
 def _lock_duration(lock_count: int) -> int:
-    """
-    Progressive lockout duration — doubles each cycle, capped at 24h.
-    lock_count is 1-indexed (first lock = 1).
-    """
+    """Progressive lockout duration — doubles each cycle, capped at 24h. lock_count is 1-indexed."""
     return min(BASE_LOCK_SECONDS * (2 ** (lock_count - 1)), MAX_LOCK_SECONDS)
 
 
-class BruteForceStrategy(BaseStrategy):
+class CredentialBasedAttacksStrategy(BaseStrategy):
 
     async def pre_process(self, request: Request) -> None:
         if "/auth" in request.url.path:
@@ -54,6 +55,8 @@ class BruteForceStrategy(BaseStrategy):
         if "/auth/sign-in" not in path:
             return body, status_code
 
+        # State keys retain the legacy "brute_force:" prefix to avoid wiping
+        # in-flight session state at upgrade time. Internal namespace only.
         fail_key       = f"brute_force:fails:{session_id}"
         lock_start_key = f"brute_force:lock_start:{session_id}"
         lock_count_key = f"brute_force:lock_count:{session_id}"
@@ -69,7 +72,7 @@ class BruteForceStrategy(BaseStrategy):
 
             if remaining > 0:
                 logger.info(
-                    "DECOY 🔒 [BRUTE_FORCE] lock active — %ds remaining: sid=%s (lock #%d)",
+                    "DECOY 🔒 [CRED_ATTACK] lock active — %ds remaining: sid=%s (lock #%d)",
                     remaining, session_id, lock_count,
                 )
                 return self._locked_response(remaining, lock_count), 423
@@ -77,7 +80,7 @@ class BruteForceStrategy(BaseStrategy):
             else:
                 # Lock expired — reset fail counter, keep lock_count for escalation
                 logger.info(
-                    "DECOY 🔓 [BRUTE_FORCE] lock #%d expired for sid=%s — resetting fail counter",
+                    "DECOY 🔓 [CRED_ATTACK] lock #%d expired for sid=%s — resetting fail counter",
                     lock_count, session_id,
                 )
                 engine_state[lock_start_key] = None
@@ -89,7 +92,7 @@ class BruteForceStrategy(BaseStrategy):
             engine_state[fail_key] = fail_count
 
             logger.info(
-                "DECOY 🔒 [BRUTE_FORCE] auth fail #%d/%d for sid=%s",
+                "DECOY 🔒 [CRED_ATTACK] auth fail #%d/%d for sid=%s",
                 fail_count, AUTH_FAIL_LOCK_THRESHOLD, session_id,
             )
 
@@ -102,7 +105,7 @@ class BruteForceStrategy(BaseStrategy):
                 duration = _lock_duration(new_lock_count)
 
                 logger.warning(
-                    "DECOY 🔒 [BRUTE_FORCE] account locked (lock #%d, duration=%ds) for sid=%s",
+                    "DECOY 🔒 [CRED_ATTACK] account locked (lock #%d, duration=%ds) for sid=%s",
                     new_lock_count, duration, session_id,
                 )
                 return self._locked_response(duration, new_lock_count), 423

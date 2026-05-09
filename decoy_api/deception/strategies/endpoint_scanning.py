@@ -1,26 +1,24 @@
 """
 GATE80 — Decoy API
-deception/strategies/scanning.py
+deception/strategies/endpoint_scanning.py
 
-Deception strategy for endpoint scanning / enumeration sessions.
+Deception strategy for endpoint-scanning sessions.
+
+OWASP Mapping:
+  - OAT-018 (Footprinting) + OAT-014 (Vulnerability Scanning)
+  - API9:2023 Improper Inventory Management
 
 Behavior:
   - 0.8s delay on all requests
   - 404 responses enriched with ghost endpoints to waste attacker time
-  - Progressive rate limiting based on SHARED session-level request counter.
+  - Progressive rate limiting based on the SHARED session-level request counter
 
 Rate limit counter design:
-  The counter key "decoy:request_count:{session_id}" is shared across
-  ALL strategies and incremented by the DeceptionEngine on every request.
-  This means the counter reflects total requests in the decoy since
-  the session was first flagged — regardless of how long classification
-  took or which strategy was active before scanning was committed.
-
-  This matches real-world WAF behavior: rate limits are enforced from
-  the first flagged request, not from when a specific attack type is
-  identified. A session that spent 3 requests in unknown_suspicious
-  before being classified as scanning has already used 3 of its 15
-  allowed requests.
+  The counter "decoy:request_count:{session_id}" is shared across all
+  strategies and incremented by the DeceptionEngine on every request.
+  It reflects total requests in the decoy since the session was first
+  flagged — regardless of how long classification took or which strategy
+  was active before scanning was committed. Matches real-world WAF behavior.
 
 Progressive rate limits:
   Limit 1:    60s  ( 1 min)   — "Slow down your requests"
@@ -39,7 +37,7 @@ import time
 from fastapi import Request
 from decoy_api.deception.strategies.base import BaseStrategy
 
-logger = logging.getLogger("decoy.deception.scanning")
+logger = logging.getLogger("decoy.deception.endpoint_scanning")
 
 SCAN_DELAY              = 0.8
 REQUEST_LIMIT_THRESHOLD = 15
@@ -99,7 +97,7 @@ def _rate_limit_message(limit_count: int) -> str:
         return "Access temporarily suspended due to excessive scanning."
 
 
-class ScanningStrategy(BaseStrategy):
+class EndpointScanningStrategy(BaseStrategy):
 
     async def pre_process(self, request: Request) -> None:
         await asyncio.sleep(SCAN_DELAY)
@@ -112,6 +110,7 @@ class ScanningStrategy(BaseStrategy):
         session_id: str,
         engine_state: dict,
     ) -> tuple[bytes, int]:
+        # State keys retain "scanning:" prefix internally; vocabulary change is external only.
         limit_start_key = f"scanning:limit_start:{session_id}"
         limit_count_key = f"scanning:limit_count:{session_id}"
 

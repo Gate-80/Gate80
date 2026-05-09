@@ -10,8 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend_api.db.database import get_db
-from backend_api.db.models import User
-from gate80_platform.db.models import DecoyConfig, EndpointInventory, Project, ProxyConfig
+from backend_api.db.models import DecoyConfig, EndpointInventory, Project, ProxyConfig, User
 from backend_api.routers import onboarding as onboarding_routes
 from backend_api.routers.onboarding import (
     DecoyConfigCreate,

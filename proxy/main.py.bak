@@ -317,17 +317,41 @@ def request_token_present(sid: str) -> bool:
     return sid.startswith("user:") or sid.startswith("admin:")
 
 def get_configured_decoy(path: str, method: str):
-    """Look up a configured decoy for (path, method) in the platform DB.
-
-    Delegates to proxy.decoy_lookup which knows about gate80_platform.db.
     """
-    try:
-        from proxy.decoy_lookup import get_decoy_config_for_endpoint
-        return get_decoy_config_for_endpoint(path, method)
-    except Exception as exc:
-        logger.warning("GATE80 configured decoy lookup failed: %s", exc)
+    Check if this path+method has a configured decoy in the backend DB.
+    Returns the decoy_config row as a dict, or None if not found.
+    """
+    if not _backend_session_factory:
         return None
-
+    try:
+        db = _backend_session_factory()
+        result = db.execute(
+            text("""
+                SELECT dc.status_code, dc.response_template, dc.delay_ms, dc.decoy_type
+                FROM decoy_config dc
+                JOIN endpoint_inventory ei ON dc.endpoint_id = ei.id
+                WHERE ei.path = :path
+                  AND ei.method = :method
+                  AND ei.is_selected_for_decoy = 1
+                  AND dc.is_enabled = 1
+                LIMIT 1
+            """),
+            {"path": path, "method": method.upper()}
+        ).fetchone()
+        db.close()
+        if result:
+            return {
+                "status_code": int(result[0] or 200),
+                "body": result[1] or {"message": "OK"},
+                "delay_ms": int(result[2] or 0),
+                "decoy_type": result[3],
+            }
+    except Exception as e:
+        logger.error("GATE80 ❌ decoy config lookup failed: %s", e)
+    return None
+# ─────────────────────────────────────────────────────────────────────────────
+# Middleware — console logging
+# ─────────────────────────────────────────────────────────────────────────────
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     req_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
@@ -425,21 +449,21 @@ async def reverse_proxy(request: Request, path: str):
 
     try:
         # ─────────────────────────────────────────────────────────────────────
-        # ─────────────────────────────────────────────────────────────────────
-        # Branch A: session already flagged → forward to adaptive decoy
+        # Branch A: session already flagged → adaptive decoy inside proxy
         # ─────────────────────────────────────────────────────────────────────
         if pre_flagged:
             try:
-                # Reclassify on every decoy request — two-layer model handles
-                # both early (cumulative) and late (window) signals.
+                # Reclassify on every decoy request — two-layer model
+                # handles both early (cumulative) and late (window) signals
                 _reclassify(window, sid)
 
-                # Check if this endpoint has a configured decoy in the platform DB.
+                response_time_ms = int((time.time() - start_time) * 1000)
+
+                # Check if this endpoint has a configured decoy in the DB
                 configured = get_configured_decoy(request.url.path, request.method)
                 if configured:
                     if configured["delay_ms"] > 0:
-                        await asyncio.sleep(configured["delay_ms"] / 1000)
-                    response_time_ms = int((time.time() - start_time) * 1000)
+                         await asyncio.sleep(configured["delay_ms"] / 1000)
                     db_log(
                         db, req_id, client_ip, request, body_str,
                         configured["status_code"], response_time_ms,
@@ -452,74 +476,76 @@ async def reverse_proxy(request: Request, path: str):
                         attack_type=window.attack_type,
                     )
                     return Response(
-                        content=json.dumps(configured["response_template"]).encode("utf-8"),
+                        content=json.dumps(configured["body"]).encode("utf-8"),
                         status_code=configured["status_code"],
                         headers={"Content-Type": "application/json"},
                     )
 
-                # No configured decoy → forward to live adaptive decoy at :8001.
-                # The decoy_api runs the full deception engine (strategy + planner)
-                # and returns a transformed response. We pass it through unchanged.
                 upstream = await forward(
                     request, body,
                     f"{DECOY_URL}/{path}",
                     extra_headers={"X-Attack-Type": window.attack_type},
                 )
-                response_time_ms = int((time.time() - start_time) * 1000)
 
-                # Update behavior window with the decoy's actual response status.
+                think_time_ms = 0
                 window.add(RequestSignal(
                     timestamp=start_time,
                     path=request.url.path,
-                    status_code=upstream.status_code,
-                    think_time_ms=0,
+                    status_code=decoy_response["status_code"],
+                    think_time_ms=think_time_ms,
                 ))
 
                 if detector is not None:
                     _, score = detector.process_request(
                         sid,
                         request.url.path,
-                        upstream.status_code,
+                        decoy_response["status_code"],
                         response_time_ms,
                     )
                 else:
                     score = 0.0
 
-                logger.info(
-                    "GATE80 [ADAPTIVE DECOY] sid=%-40s score=%.4f attack_type=%s %s %s -> %d",
-                    sid, score, window.attack_type,
-                    request.method, request.url.path, upstream.status_code,
+                    logger.info(
+                    "GATE80 🎭 [ADAPTIVE DECOY] sid=%-40s score=%.4f "
+                    "attack_type=%s strategy=%s depth=%s %s %s → %d",
+                    sid,
+                    score,
+                    window.attack_type,
+                    decoy_plan.strategy,
+                    decoy_plan.decoy_depth,
+                    request.method,
+                    request.url.path,
+                    decoy_response["status_code"],
                 )
 
                 db_log(
                     db, req_id, client_ip, request, body_str,
-                    upstream.status_code, response_time_ms,
+                    decoy_response["status_code"], response_time_ms,
                     forwarded_to_backend=False,
                     session_id=sid,
                     anomaly_score=score,
                     routed_to="adaptive_decoy",
                     flagged_as_suspicious=True,
-                    suspicion_reason=f"Adaptive decoy: {window.attack_type}",
+                    suspicion_reason=f"Adaptive decoy: {decoy_plan.strategy}",
                     attack_type=window.attack_type,
                 )
 
-                # Pass the decoy's response through to the client unchanged.
-                # Drop hop-by-hop headers that Starlette will set itself.
-                upstream_headers = dict(upstream.headers)
-                for h in ("content-encoding", "transfer-encoding",
-                          "content-length", "connection"):
-                    upstream_headers.pop(h, None)
                 return Response(
-                    content=upstream.content,
-                    status_code=upstream.status_code,
-                    headers=upstream_headers,
-                    media_type=upstream.headers.get("content-type", "application/json"),
+                    content=json.dumps(decoy_response["body"]).encode("utf-8"),
+                    status_code=decoy_response["status_code"],
+                    headers=decoy_response["headers"],
+                    media_type="application/json",
                 )
 
             except Exception as exc:
                 response_time_ms = int((time.time() - start_time) * 1000)
-                logger.warning("GATE80 decoy unreachable: %s", exc)
-                logger.error("GATE80 adaptive decoy failed: %s", exc)
+                error_msg = (
+                    "Decoy unavailable"
+                    if isinstance(exc, httpx.ConnectError)
+                    else "Decoy timeout"
+                )
+                logger.warning("GATE80 ⚠️  decoy unreachable: %s", exc)
+                logger.error("GATE80 ❌ adaptive decoy failed: %s", exc)
 
                 db_log(
                     db, req_id, client_ip, request, body_str,
@@ -537,6 +563,7 @@ async def reverse_proxy(request: Request, path: str):
                     headers={"Content-Type": "application/json"},
                 )
 
+        # ─────────────────────────────────────────────────────────────────────
         # Branch B: normal session → forward to real backend
         # ─────────────────────────────────────────────────────────────────────
         else:

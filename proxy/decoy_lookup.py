@@ -1,17 +1,28 @@
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+"""Read configured decoys from the platform DB.
+
+Uses NullPool so each call opens and closes its own connection. SQLite
+connections are cheap, and NullPool prevents the pool exhaustion we hit
+under load (QueuePool default size 5 + overflow 10 = 15 max).
+"""
 import os
 
-BACKEND_DB_PATH = os.getenv("BACKEND_DB_PATH", "digital_wallet.db")
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
+
+
+PLATFORM_DB_PATH = os.getenv("GATE80_PLATFORM_DB_PATH", "data/gate80_platform.db")
 
 _engine = create_engine(
-    f"sqlite:///{BACKEND_DB_PATH}",
-    connect_args={"check_same_thread": False}
+    f"sqlite:///{PLATFORM_DB_PATH}",
+    connect_args={"check_same_thread": False},
+    poolclass=NullPool,
 )
 SessionLocal = sessionmaker(bind=_engine)
 
 
 def get_decoy_config_for_endpoint(path: str, method: str):
+    """Return the deployed decoy config for (path, method), or None if not configured."""
     db = SessionLocal()
     try:
         row = db.execute(
@@ -28,7 +39,7 @@ def get_decoy_config_for_endpoint(path: str, method: str):
             {
                 "path": path if path.startswith("/") else f"/{path}",
                 "method": method.upper(),
-            }
+            },
         ).fetchone()
 
         if not row:

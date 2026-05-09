@@ -1,11 +1,15 @@
 """
 GATE80 — Decoy API
-deception/strategies/fraud.py
+deception/strategies/financial_fraud.py
 
-Deception strategy for financial fraud sessions.
+Deception strategy for financial-fraud sessions.
+
+OWASP Mapping:
+  - OAT-012 (Cashing Out)
+  - API6:2023 Unrestricted Access to Sensitive Business Flows
 
 Behavior:
-  - 1.2s delay on financial endpoints (plausible for compliance checks)
+  - 1.2s delay on financial endpoints (plausible compliance latency)
   - Transfer / withdraw / pay-bill responses intercepted:
       * Status changed from 200 → 202 (Accepted — believable pending state)
       * Message replaced with compliance review language
@@ -24,7 +28,7 @@ import logging
 from fastapi import Request
 from decoy_api.deception.strategies.base import BaseStrategy
 
-logger = logging.getLogger("decoy.deception.fraud")
+logger = logging.getLogger("decoy.deception.financial_fraud")
 
 # Delays
 FINANCIAL_DELAY = 1.2
@@ -48,13 +52,10 @@ def _distort_balance(value_str: str) -> str:
         return value_str
 
 
-class FraudStrategy(BaseStrategy):
+class FinancialFraudStrategy(BaseStrategy):
 
     async def pre_process(self, request: Request) -> None:
-        """
-        Add a deliberate delay on financial endpoints.
-        Mimics real compliance/AML processing latency — believable to attacker.
-        """
+        """Add a deliberate delay on financial endpoints (mimics AML/compliance latency)."""
         if any(op in request.url.path for op in FINANCIAL_WRITE_OPS) or "/wallet" in request.url.path:
             await asyncio.sleep(FINANCIAL_DELAY)
         else:
@@ -69,14 +70,10 @@ class FraudStrategy(BaseStrategy):
         engine_state: dict,
     ) -> tuple[bytes, int]:
         """
-        Transform financial operation responses.
+        Write ops (transfer/withdraw/pay-bill): return 202 with compliance review wording
+        and distort displayed balance.
 
-        Write operations (transfer/withdraw/pay-bill):
-          - Return 202 with "queued for compliance review" messaging
-          - Distort displayed balance so attacker tracks wrong numbers
-
-        Read operations (GET /wallet):
-          - Return 200 but with distorted balance
+        Read ops (GET /wallet): return 200 but with distorted balance.
         """
         if status_code not in (200, 201):
             return body, status_code
@@ -94,7 +91,7 @@ class FraudStrategy(BaseStrategy):
 
         if is_write:
             logger.info(
-                "DECOY 💸 [FRAUD] intercepting financial write op: path=%s sid=%s",
+                "DECOY 💸 [FIN_FRAUD] intercepting financial write op: path=%s sid=%s",
                 path, session_id,
             )
             data["message"] = "Transaction submitted for compliance review"
