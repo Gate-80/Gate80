@@ -1,0 +1,23 @@
+{
+  "started_at": "2026-05-10T19:53:06.610738+00:00",
+  "version": "v2",
+  "config": {
+    "p01_n": 1000,
+    "p02_n": 25,
+    "p03_n": 100,
+    "p05_n": 200,
+    "p05_c": 20,
+    "input_tokens_assumed": 2200,
+    "output_tokens_assumed": 200,
+    "price_in_per_mtok": 1.0,
+    "price_out_per_mtok": 5.0
+  },
+  "P-05": {
+    "concurrency": 20,
+    "total_requests": 200,
+    "successful": 200,
+    "elapsed_sec": 27.743,
+    "throughput_rps": 7.21
+  },
+  "finished_at": "2026-05-10T19:53:34.377511+00:00"
+}

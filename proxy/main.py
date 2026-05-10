@@ -87,6 +87,15 @@ app = FastAPI(
     openapi_url=None,
 )
 
+
+
+@app.get("/health")
+async def proxy_health():
+    """Fast-path health check. Bypasses classification, forwarding, and logging.
+    Intended for load balancers and uptime probes — does NOT exercise the
+    normal request pipeline."""
+    return {"status": "ok", "service": "gate80-proxy"}
+
 http_client = httpx.AsyncClient(timeout=30.0)
 detector: AnomalyDetector | None = None
 
