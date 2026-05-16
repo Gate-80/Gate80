@@ -200,6 +200,27 @@ def hello():
     return {"message": "Hello from the API"}
 
 
+# ─────────────────────────────────────────────────────────────────────
+# TEST-ONLY: Admin reset endpoint
+# Allows the security test suite to isolate scenarios by clearing the
+# per-session engine state (lockout counters, signup velocity, etc.).
+# Bound to localhost only — verified at request time below.
+# ─────────────────────────────────────────────────────────────────────
+@app.post("/admin/reset_state")
+async def reset_state_endpoint(request: Request, session_id: str | None = None):
+    """Clear engine state. For internal testing only."""
+    client_ip = request.client.host if request.client else ""
+    # Only allow from localhost
+    if client_ip not in ("127.0.0.1", "::1", "localhost"):
+        return JSONResponse(
+            status_code=403,
+            content={"error": "Admin reset is localhost-only"},
+        )
+    cleared = deception_engine.reset_state(session_id)
+    return {"cleared": cleared, "session_id": session_id}
+
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Routers
 # ─────────────────────────────────────────────────────────────────────────────

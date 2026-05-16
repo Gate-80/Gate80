@@ -55,6 +55,23 @@ def _strategy_already_strong(status_code: int) -> bool:
 
 class DeceptionEngine:
 
+    def reset_state(self, session_id: str | None = None) -> int:
+        """
+        Clear engine state for one session, or all sessions if no id given.
+        Returns number of keys cleared. Used for test isolation between
+        scenarios — NOT a production endpoint.
+        """
+        if session_id is None:
+            n = len(self._engine_state)
+            self._engine_state.clear()
+            return n
+        # Keys are namespaced like "brute_force:lock_count:{session_id}"
+        # so we drop any key ending in the session_id
+        keys = [k for k in self._engine_state if k.endswith(f":{session_id}")]
+        for k in keys:
+            del self._engine_state[k]
+        return len(keys)
+
     def __init__(self):
         self._strategies = {
             "credential_based_attacks": CredentialBasedAttacksStrategy(),
