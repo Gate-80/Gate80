@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+# tests/security/lib/common.sh
+# Shared helpers for all S-01..S-05 scenario scripts.
+# Source this from each scenario: . "$(dirname "$0")/../lib/common.sh"
+
+set -u  # treat unset variables as errors
+
+# -----------------------------
+# Targets
+# -----------------------------
+export PROXY_URL="${PROXY_URL:-http://localhost:8080}"
+export BACKEND_URL="${BACKEND_URL:-http://localhost:8000}"  # for direct-access tests only
+export DECOY_URL="${DECOY_URL:-http://localhost:8001}"
+
+# -----------------------------
+# Paths
+# -----------------------------
+# GATE80_ROOT must be set by the caller (run_all_attacks.sh sets this)
+GATE80_ROOT="${GATE80_ROOT:-$HOME/Documents/KAU/GP/Gate80}"
+RESULTS_DIR="${RESULTS_DIR:-$GATE80_ROOT/tests/security/results}"
+DIGITAL_DB="${DIGITAL_DB:-$GATE80_ROOT/digital_wallet.db}"
+DECOY_DB="${DECOY_DB:-$GATE80_ROOT/decoy_wallet.db}"
+PROXY_LOG_DB="${PROXY_LOG_DB:-$GATE80_ROOT/proxy_logs.db}"
+
+# Wordlist paths (Kali default)
+SECLISTS="${SECLISTS:-/usr/share/seclists}"
+WL_COMMON_PATHS="${WL_COMMON_PATHS:-$SECLISTS/Discovery/Web-Content/common.txt}"
+WL_RAFT_LARGE="${WL_RAFT_LARGE:-$SECLISTS/Discovery/Web-Content/raft-large-words.txt}"
+WL_API_ENDPOINTS="${WL_API_ENDPOINTS:-$SECLISTS/Discovery/Web-Content/api/api-endpoints.txt}"
+WL_PARAMS="${WL_PARAMS:-$SECLISTS/Discovery/Web-Content/burp-parameter-names.txt}"
+WL_TOP10K_PWD="${WL_TOP10K_PWD:-$SECLISTS/Passwords/Common-Credentials/10-million-password-list-top-10000.txt}"
+WL_TOP100_PWD="${WL_TOP100_PWD:-$SECLISTS/Passwords/Common-Credentials/10-million-password-list-top-100.txt}"
+
+# -----------------------------
+# Test fixtures
+# -----------------------------
+# Real seeded users (confirmed in digital_wallet.db)
+LEGIT_USER_EMAIL="sectest@gate80.local"
+LEGIT_USER_PASSWORD="X9k2vQ7nL4mPwR8t"
+LEGIT_USER_ID="u_1005"
+TRANSFER_TARGET_ID="u_1001"
+TRANSFER_TARGET_2_ID="u_1002"
+
+# -----------------------------
+# Colored output
+# -----------------------------
+RED=$'\033[31m'
+GREEN=$'\033[32m'
+YELLOW=$'\033[33m'
+BLUE=$'\033[34m'
+RESET=$'\033[0m'
+
+log() { printf "%s[%s]%s %s\n" "$BLUE" "$(date +%H:%M:%S)" "$RESET" "$*"; }
+ok()  { printf "%s[ OK ]%s %s\n" "$GREEN" "$RESET" "$*"; }
+warn(){ printf "%s[WARN]%s %s\n" "$YELLOW" "$RESET" "$*"; }
+err() { printf "%s[FAIL]%s %s\n" "$RED" "$RESET" "$*" >&2; }
+
+# -----------------------------
+# Helpers
+# -----------------------------
+
+# get a valid session token for the legitimate test user (kept for back-compat)
+get_legit_token() {
+    curl -s -X POST "$PROXY_URL/api/v1/auth/sign-in" \
+        -H "Content-Type: application/json" \
+        -d "{\"email\":\"$LEGIT_USER_EMAIL\",\"password\":\"$LEGIT_USER_PASSWORD\"}" \
+        | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('token',''))"
+}
+
+# get a token for the victim user — used in S-03 (stolen-token attack)
+# The victim user has NOT been attacked directly, so login should succeed.
+get_victim_token() {
+    curl -s -X POST "$PROXY_URL/api/v1/auth/sign-in" \
+        -H "Content-Type: application/json" \
+        -d "{\"email\":\"$VICTIM_USER_EMAIL\",\"password\":\"$VICTIM_USER_PASSWORD\"}" \
+        | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('token',''))"
+}
+
+# snapshot row counts in both DBs — used by S-05 verify_containment
+snapshot_db_counts() {
+    local out_file="$1"
+    # Count BOTH payments and transactions tables — transfers populate
+    # transactions, not payments. Sum them for total transaction count.
+    local real_tx=$(( $(sqlite3 "$DIGITAL_DB" 'SELECT COUNT(*) FROM payments;' 2>/dev/null || echo 0) + $(sqlite3 "$DIGITAL_DB" 'SELECT COUNT(*) FROM transactions;' 2>/dev/null || echo 0) ))
+    local decoy_tx=$(( $(sqlite3 "$DECOY_DB" 'SELECT COUNT(*) FROM payments;' 2>/dev/null || echo 0) + $(sqlite3 "$DECOY_DB" 'SELECT COUNT(*) FROM transactions;' 2>/dev/null || echo 0) ))
+    {
+        echo "{"
+        echo "  \"timestamp\": \"$(date -Iseconds)\","
+        echo "  \"digital_wallet\": {"
+        echo "    \"users\":   $(sqlite3 "$DIGITAL_DB" 'SELECT COUNT(*) FROM users;' 2>/dev/null || echo 0),"
+        echo "    \"wallets\": $(sqlite3 "$DIGITAL_DB" 'SELECT COUNT(*) FROM wallets;' 2>/dev/null || echo 0),"
+        echo "    \"payments\":$real_tx"
+        echo "  },"
+        echo "  \"decoy_wallet\": {"
+        echo "    \"users\":   $(sqlite3 "$DECOY_DB" 'SELECT COUNT(*) FROM users;' 2>/dev/null || echo 0),"
+        echo "    \"wallets\": $(sqlite3 "$DECOY_DB" 'SELECT COUNT(*) FROM wallets;' 2>/dev/null || echo 0),"
+        echo "    \"payments\":$decoy_tx"
+        echo "  }"
+        echo "}"
+    } > "$out_file"
+}
+
+# count flagged / routed requests in proxy_logs.db
+count_proxy_routed_to() {
+    local target="$1"  # 'backend' or 'adaptive_decoy'
+    sqlite3 "$PROXY_LOG_DB" \
+        "SELECT COUNT(*) FROM proxy_requests WHERE routed_to='$target';" 2>/dev/null || echo 0
+}
+
+count_proxy_flagged() {
+    sqlite3 "$PROXY_LOG_DB" \
+        "SELECT COUNT(*) FROM proxy_requests WHERE flagged_as_suspicious=1;" 2>/dev/null || echo 0
+}
+
+snapshot_proxy_log_counts() {
+    local out_file="$1"
+    {
+        echo "{"
+        echo "  \"timestamp\": \"$(date -Iseconds)\","
+        echo "  \"total_requests\":  $(sqlite3 "$PROXY_LOG_DB" 'SELECT COUNT(*) FROM proxy_requests;' 2>/dev/null || echo 0),"
+        echo "  \"routed_to_backend\":      $(count_proxy_routed_to backend),"
+        echo "  \"routed_to_decoy\":        $(count_proxy_routed_to adaptive_decoy),"
+        echo "  \"flagged_as_suspicious\":  $(count_proxy_flagged)"
+        echo "}"
+    } > "$out_file"
+}
+
+# write a scenario result JSON
+write_result() {
+    local scenario_id="$1"
+    local status="$2"     # PASS / FAIL / PARTIAL
+    local summary="$3"
+    local detail_json="$4"  # raw JSON object as string
+    local out_file="$RESULTS_DIR/${scenario_id}.json"
+    {
+        echo "{"
+        echo "  \"scenario_id\": \"$scenario_id\","
+        echo "  \"timestamp\": \"$(date -Iseconds)\","
+        echo "  \"status\": \"$status\","
+        echo "  \"summary\": \"$summary\","
+        echo "  \"detail\": $detail_json"
+        echo "}"
+    } > "$out_file"
+    log "Result written: $out_file"
+}
+
+# guard — ensure GATE80 services are up
+ensure_services_up() {
+    local proxy_health=$(curl -s -o /dev/null -w "%{http_code}" "$PROXY_URL/health" 2>/dev/null)
+    if [ "$proxy_health" != "200" ]; then
+        err "Proxy not responding at $PROXY_URL (got $proxy_health)"
+        err "Start services first: cd \$GATE80_ROOT && bash run_all.sh"
+        return 1
+    fi
+    ok "Proxy is up at $PROXY_URL"
+    return 0
+}
+
+# Victim user — stolen-token target for S-03 scenarios
+# NOT attacked at the login layer so its session stays valid
+VICTIM_USER_EMAIL="victim2@gate80test.com"
+VICTIM_USER_PASSWORD="Z3m7pQ2vN8bRwX6t"
+VICTIM_USER_ID="u_1006"
+
+
+# Test isolation: clear the decoy engine's per-session lockout/counter state
+# Called at the start of each scenario so prior scenarios don't taint this one.
+# Goes directly to the decoy API (not through the proxy) to avoid affecting metrics.
+reset_decoy_state() {
+    local session_id="${1:-}"
+    local payload=""
+    if [ -n "$session_id" ]; then
+        payload="?session_id=$session_id"
+    fi
+    curl -s -X POST "$DECOY_URL/admin/reset_state${payload}" >/dev/null 2>&1 || true
+}

@@ -41,6 +41,43 @@ from detection.model import AnomalyDetector
 from proxy.behaviour_class import (
     SessionWindow, RequestSignal, classify_behavior, BEHAVIOR_WINDOW_SIZE
 )
+
+# ─────────────────────────────────────────────────────────────────────
+# Transfer rate-limit guard (Filter/Router pattern, Bridges et al. 2025)
+# Deterministic pre-check that runs BEFORE behavioural classification.
+# Catches rapid wallet-drain attacks using a valid session token —
+# a pattern that authenticated session-level behavioural models miss.
+# ─────────────────────────────────────────────────────────────────────
+from collections import deque
+import re as _re
+
+# Configuration — tune these to balance false-positives vs containment
+RAPID_TRANSFER_THRESHOLD = 5     # N transfers in window flags the session
+RAPID_TRANSFER_WINDOW_SEC = 60   # rolling window length
+TRANSFER_PATH_PATTERN = _re.compile(r"^/api/v1/users/[^/]+/wallet/transfer/[^/]+/?$")
+
+# In-memory per-session transfer timestamps. Cleared on service restart.
+_transfer_history: dict[str, deque] = {}
+
+def _is_transfer_endpoint(path: str, method: str) -> bool:
+    """Check if a request targets the wallet transfer endpoint."""
+    return method == "POST" and bool(TRANSFER_PATH_PATTERN.match(path))
+
+def _check_rapid_transfer(session_id: str, now: float) -> bool:
+    """
+    Returns True if this session has exceeded RAPID_TRANSFER_THRESHOLD
+    transfers within the RAPID_TRANSFER_WINDOW_SEC window.
+    """
+    history = _transfer_history.setdefault(session_id, deque())
+    # Drop entries outside the window
+    cutoff = now - RAPID_TRANSFER_WINDOW_SEC
+    while history and history[0] < cutoff:
+        history.popleft()
+    # Record current request
+    history.append(now)
+    # Flag if threshold exceeded
+    return len(history) > RAPID_TRANSFER_THRESHOLD
+
 import json
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -453,6 +490,19 @@ async def reverse_proxy(request: Request, path: str):
     pre_flagged = False
     if detector is not None:
         state = detector.get_or_create_session(sid)
+
+        # Deterministic rate-limit pre-check (Filter/Router pattern).
+        # Authenticated session-level behavioural models miss rapid
+        # wallet drains using a valid token. This guard catches them.
+        if _is_transfer_endpoint(request.url.path, request.method):
+            if _check_rapid_transfer(sid, time.time()):
+                if not state.is_anomalous:
+                    state.is_anomalous = True
+                    logger.warning(
+                        "[rate-limit] session %s flagged: >%d transfers in %ds",
+                        sid, RAPID_TRANSFER_THRESHOLD, RAPID_TRANSFER_WINDOW_SEC,
+                    )
+
         pre_flagged = state.is_anomalous
 
     try:

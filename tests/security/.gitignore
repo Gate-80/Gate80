@@ -1,0 +1,6 @@
+# Test result outputs — generated per run, not source-of-truth
+results/*.json
+results/*.log
+
+# Keep the dir but not the contents
+!results/.gitkeep
