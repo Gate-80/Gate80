@@ -71,7 +71,7 @@ DECOY_DB_PATH   = os.getenv("DECOY_DB_PATH",   "decoy_wallet.db")
 # ─────────────────────────────────────────────────────────────────────────────
 DETECTION_DISABLED = os.getenv("GATE80_DETECTION_DISABLED", "0") == "1"
 FORCE_DECOY_API = os.getenv("FORCE_DECOY_API", "0") == "1"
-HOP_BY_HOP_HEADERS = {
+HOP_BY_HOP_HEADERS = { #headers that cannot be bybass between proxy and the backend
     "connection", "keep-alive", "proxy-authenticate",
     "proxy-authorization", "te", "trailers",
     "transfer-encoding", "upgrade", "content-length",
@@ -80,7 +80,7 @@ HOP_BY_HOP_HEADERS = {
 # ─────────────────────────────────────────────────────────────────────────────
 # App & shared resources
 # ─────────────────────────────────────────────────────────────────────────────
-app = FastAPI(
+app = FastAPI( # creating the fast api for the reverse proxy 
     title="GATE80 Reverse Proxy",
     docs_url=None,
     redoc_url=None,
@@ -106,7 +106,7 @@ _decoy_session_factory   = None
 session_windows: dict[str, "SessionWindow"] = {}
 
 
-def get_or_create_window(sid: str) -> SessionWindow:
+def get_or_create_window(sid: str) -> SessionWindow: #getting the session widnow based on the session window id
     if sid not in session_windows:
         session_windows[sid] = SessionWindow()
     return session_windows[sid]
@@ -116,57 +116,57 @@ def get_or_create_window(sid: str) -> SessionWindow:
 # Startup / shutdown
 # ─────────────────────────────────────────────────────────────────────────────
 @app.on_event("startup")
-def startup_event():
+def startup_event():# its the event that starting up the proxy 
     global detector, _backend_session_factory, _decoy_session_factory
 
-    init_db()
+    init_db() # initiating the database
     logger.info("✅ Proxy database initialised")
 
-    if DETECTION_DISABLED:
+    if DETECTION_DISABLED:# if the detection were disabled a warning will come in the terminal
         logger.warning(
             "⚠️  GATE80_DETECTION_DISABLED=1 — detection is OFF. "
             "All traffic forwarded to real backend. "
             "Use this mode for dataset generation only."
         )
     else:
-        if os.path.exists(MODEL_PATH) and os.path.exists(SCALER_PATH):
+        if os.path.exists(MODEL_PATH) and os.path.exists(SCALER_PATH):#also initiating the anamoloy detector
             detector = AnomalyDetector(MODEL_PATH, SCALER_PATH)
         else:
-            logger.warning(
+            logger.warning( #else it couldnt fetch the detector file
                 "⚠️  Model files not found (%s, %s) — detection disabled.",
                 MODEL_PATH, SCALER_PATH,
             )
 
-    if os.path.exists(BACKEND_DB_PATH):
+    if os.path.exists(BACKEND_DB_PATH):# intitaing the db connection for token mirroring
         engine = create_engine(
             f"sqlite:///{BACKEND_DB_PATH}",
             connect_args={"check_same_thread": False}
         )
         _backend_session_factory = sessionmaker(bind=engine)
         logger.info("✅ Backend DB connected for token mirroring")
-    else:
+    else: #else the db connection eas failed
         logger.warning("⚠️  Backend DB not found — token mirroring disabled")
 
-    if os.path.exists(DECOY_DB_PATH):
+    if os.path.exists(DECOY_DB_PATH): # intitaing the decoy db connection for token mirroring
         engine = create_engine(
             f"sqlite:///{DECOY_DB_PATH}",
             connect_args={"check_same_thread": False}
         )
         _decoy_session_factory = sessionmaker(bind=engine)
         logger.info("✅ Decoy DB connected for token mirroring")
-    else:
+    else: #else the db connection eas failed
         logger.warning("⚠️  Decoy DB not found — token mirroring disabled")
 
-    if not DETECTION_DISABLED:
+    if not DETECTION_DISABLED:#this lines to print out the dectection is enabled in the proxy terminal
         logger.info(
             "✅ Adaptive deception ready — window_size=%d, decay=%.2f, "
             "behavior_classes=%s",
             BEHAVIOR_WINDOW_SIZE, 0.85,
-            ["brute_force", "scanning", "fraud", "unknown_suspicious"],
+            ["brute_force", "scanning", "fraud", "unknown_suspicious"], # these are the types of attack that was tested for detection
         )
 
 
-@app.on_event("shutdown")
+@app.on_event("shutdown") # here to shutdown the prxy event
 async def shutdown_event():
     await http_client.aclose()
 
@@ -175,25 +175,25 @@ async def shutdown_event():
 # Token mirroring
 # ─────────────────────────────────────────────────────────────────────────────
 def mirror_token_to_decoy(token: str) -> None:
-    if not _backend_session_factory or not _decoy_session_factory:
+    if not _backend_session_factory or not _decoy_session_factory: # if backend db and decoy db is not ready stop the function
         return
 
     try:
-        backend_db = _backend_session_factory()
+        backend_db = _backend_session_factory()#opens up a connection
         row = backend_db.execute(
-            text("SELECT user_id FROM user_sessions WHERE token = :token"),
+            text("SELECT user_id FROM user_sessions WHERE token = :token"), #search for the token in usersession taple
             {"token": token}
         ).fetchone()
         backend_db.close()
 
-        if not row:
+        if not row: #if the mirror is not found leave the function
             logger.debug("Token not found in backend DB — skipping mirror")
             return
 
-        user_id = row[0]
+        user_id = row[0] # store the user id here
 
         backend_db = _backend_session_factory()
-        user = backend_db.execute(
+        user = backend_db.execute( #storing the user here 
             text("SELECT id, full_name, email, phone, city, is_verified FROM users WHERE id = :uid"),
             {"uid": user_id}
         ).fetchone()
@@ -206,7 +206,7 @@ def mirror_token_to_decoy(token: str) -> None:
             {"uid": user_id}
         ).fetchone()
 
-        if not existing_user and user:
+        if not existing_user and user: #if user not existed add new one into the users taple
             decoy_db.execute(
                 text(
                     "INSERT INTO users (id, full_name, email, password, phone, city, is_verified) "
@@ -223,12 +223,12 @@ def mirror_token_to_decoy(token: str) -> None:
                 }
             )
 
-            existing_wallet = decoy_db.execute(
+            existing_wallet = decoy_db.execute(#here is to search from the wallet taple for the user
                 text("SELECT id FROM wallets WHERE user_id = :uid"),
                 {"uid": user_id}
             ).fetchone()
 
-            if not existing_wallet:
+            if not existing_wallet: #if the wallet is not exist insert a new one
                 decoy_db.execute(
                     text(
                         "INSERT INTO wallets (id, user_id, currency_code, balance, status) "
@@ -237,12 +237,13 @@ def mirror_token_to_decoy(token: str) -> None:
                     {"id": f"w_mirror_{user_id}", "user_id": user_id}
                 )
 
-        existing_token = decoy_db.execute(
+        existing_token = decoy_db.execute( #fetching the existed token
+            
             text("SELECT token FROM user_sessions WHERE token = :token"),
             {"token": token}
         ).fetchone()
 
-        if not existing_token:
+        if not existing_token:#if the token is not existed insert a new one
             decoy_db.execute(
                 text("INSERT INTO user_sessions (token, user_id) VALUES (:token, :user_id)"),
                 {"token": token, "user_id": user_id}
@@ -256,31 +257,32 @@ def mirror_token_to_decoy(token: str) -> None:
             user_id, token[:8]
         )
 
-    except Exception as e:
+    except Exception as e: #handling an exception if the mirroring is failed
         logger.error("GATE80 ❌ token mirroring failed: %s", e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
-def get_client_ip(request: Request) -> str:
+def get_client_ip(request: Request) -> str: #function that gets the client ip number it also nefit us to know where the request come for
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
         return forwarded_for.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    return request.client.host if request.client else "unknown" #if the "-Forwarded-For" is not avalible it uses the direct fastapi ip else it returns unknown
 
 
-def get_session_id(request: Request) -> str:
+def get_session_id(request: Request) -> str:#function that helps what session the request comes from
     user_token  = request.headers.get("X-User-Token")
     admin_token = request.headers.get("X-Admin-Token")
-    if user_token:
+    #it checks if the token was comin from a user session or an admin session
+    if user_token: 
         return f"user:{user_token}"
     if admin_token:
         return f"admin:{admin_token}"
-    return f"ip:{get_client_ip(request)}"
+    return f"ip:{get_client_ip(request)}"# if there isnt a token it uses the ip of th request as the identinty of the session
 
 
-def build_forward_headers(request: Request, extra: dict | None = None) -> dict:
+def build_forward_headers(request: Request, extra: dict | None = None) -> dict: #this function will help you build the header that will be sent to backend or decoyapi
     headers = {
         k: v
         for k, v in request.headers.items()
@@ -288,11 +290,11 @@ def build_forward_headers(request: Request, extra: dict | None = None) -> dict:
     }
     headers["X-From-Proxy"] = "1"
     if extra:
-        headers.update(extra)
+        headers.update(extra) #here if there is extra header also it sent ou to backend and decoy api
     return headers
 
 
-async def forward(
+async def forward(#this function help gets to the specifec request to the taget
     request: Request,
     body: bytes,
     target_url: str,
@@ -300,7 +302,7 @@ async def forward(
 ) -> httpx.Response:
     return await http_client.request(
         method=request.method,
-        url=target_url,
+        url=target_url, # for example "http://127.0.0.1:8000/api/v1/auth/sign-in" 
         params=request.query_params,
         content=body,
         headers=build_forward_headers(request, extra_headers),
@@ -320,9 +322,9 @@ def _reclassify(window: SessionWindow, sid: str) -> None:
             "GATE80 🔄 [BEHAVIOR SHIFT] sid=%-40s %s → %s",
             sid, window.attack_type, new_type,
         )
-        window.attack_type = new_type
+        window.attack_type = new_type #it befit us if the attacker changed the behaviour of the attack
 
-def request_token_present(sid: str) -> bool:
+def request_token_present(sid: str) -> bool: #check if the token was connected to a session 
     return sid.startswith("user:") or sid.startswith("admin:")
 
 def get_configured_decoy(path: str, method: str):
@@ -337,7 +339,8 @@ def get_configured_decoy(path: str, method: str):
         logger.warning("GATE80 configured decoy lookup failed: %s", exc)
         return None
 
-@app.middleware("http")
+@app.middleware("http") #It provides a clear trace for every request, including the HTTP method,
+#request path, status code, response time, and request ID. This is very useful for integration testing, debugging, request tracking, and SOC monitoring.
 async def log_requests(request: Request, call_next):
     req_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     start  = time.time()
@@ -360,16 +363,19 @@ async def log_requests(request: Request, call_next):
 )
 
 async def reverse_proxy(request: Request, path: str):
-    req_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
-    start_time = time.time()
-    client_ip = get_client_ip(request)
-    sid = get_session_id(request)
+    req_id = request.headers.get("X-Request-Id") or str(uuid.uuid4()) #Generate or reuse a unique request ID for tracing.
 
-    window = get_or_create_window(sid)
+    start_time = time.time()# Record the request start time to calculate total response time later.
+    client_ip = get_client_ip(request)# Extract the client IP address.
 
-    body = await request.body()
-    body_str = body.decode("utf-8", errors="ignore") if body else None
-    db = SessionLocal()
+    sid = get_session_id(request)#extact the session id 
+
+    window = get_or_create_window(sid)# Retrieve or create the behavior window for this session.
+    # The window stores recent requests and is used for attack behavior classification.
+
+    body = await request.body() #here to read the Request body
+    body_str = body.decode("utf-8", errors="ignore") if body else None # Convert the request body to text for logging.
+    db = SessionLocal()#Open a proxy database session to store request logs and routing decisions.
 
     # Control-plane routes should not affect detection state
     if path.startswith("api/v1/onboarding"):
@@ -384,9 +390,11 @@ async def reverse_proxy(request: Request, path: str):
             db.close()
 
     last_signal_time = window.requests[-1].timestamp if window.requests else start_time
-    think_time_ms = (start_time - last_signal_time) * 1000
+    think_time_ms = (start_time - last_signal_time) * 1000 # Calculate think time, which is the time gap between the current request
+
 
     # Dataset generation mode — skip detection and decoy routing
+
     if DETECTION_DISABLED:
         try:
             upstream = await forward(request, body, f"{BACKEND_URL}/{path}")
@@ -441,6 +449,7 @@ async def reverse_proxy(request: Request, path: str):
             db.close()
 
     # Normal operation — detection active
+    # If the session was previously flagged, future requests are routed to deception.
     pre_flagged = False
     if detector is not None:
         state = detector.get_or_create_session(sid)
@@ -458,12 +467,13 @@ async def reverse_proxy(request: Request, path: str):
                 _reclassify(window, sid)
 
                 # Check if this endpoint has a configured decoy in the platform DB.
+                # This can be used as a fallback or endpoint-specific deception policy.
                 configured = get_configured_decoy(request.url.path, request.method)
-                if configured:
+                if configured:# If a configured decoy exists, apply the configured delay and return
                     if configured["delay_ms"] > 0:
                         await asyncio.sleep(configured["delay_ms"] / 1000)
                     response_time_ms = int((time.time() - start_time) * 1000)
-                    db_log(
+                    db_log(# Log the configured decoy response in the proxy database.
                         db, req_id, client_ip, request, body_str,
                         configured["status_code"], response_time_ms,
                         forwarded_to_backend=False,
@@ -597,7 +607,8 @@ async def reverse_proxy(request: Request, path: str):
 
                 token = request.headers.get("X-User-Token")
                 if token:
-                    mirror_token_to_decoy(token)
+                    mirror_token_to_decoy(token) # Mirror the user token to the Decoy API database when available.
+
 
                 logger.warning(
                     "GATE80 🚨 [FLAGGED] sid=%-40s score=%.4f attack_type=%s "
@@ -608,7 +619,8 @@ async def reverse_proxy(request: Request, path: str):
                 )
 
             else:
-                logger.info(
+                logger.info( # Log normal backend routing or suspicious detection results.
+
                     "GATE80 ✅ [BACKEND] sid=%-40s score=%.4f %s %s → %d",
                     sid,
                     score,
@@ -634,13 +646,14 @@ async def reverse_proxy(request: Request, path: str):
                 attack_type=attack_type,
             )
 
-            return Response(
+            return Response( # Return the real backend response to the client.
                 content=upstream.content,
                 status_code=upstream.status_code,
                 headers=dict(upstream.headers),
             )
 
-        except httpx.ConnectError:
+        except httpx.ConnectError: # Handle backend connection failures.
+
             response_time_ms = int((time.time() - start_time) * 1000)
             logger.error("GATE80 ❌ backend unavailable at %s", BACKEND_URL)
 
@@ -663,10 +676,11 @@ async def reverse_proxy(request: Request, path: str):
                 status_code=503,
                 headers={"Content-Type": "application/json"},
             )
+      # Handle backend timeout errors.
 
         except httpx.TimeoutException:
             response_time_ms = int((time.time() - start_time) * 1000)
-            logger.error("GATE80 ⏱ backend timeout: %s/%s", BACKEND_URL, path)
+            logger.error("GATE80 backend timeout: %s/%s", BACKEND_URL, path)
 
             db_log(
                 db,
@@ -687,6 +701,6 @@ async def reverse_proxy(request: Request, path: str):
                 status_code=504,
                 headers={"Content-Type": "application/json"},
             )
-
+ #finally closing the db
     finally:
         db.close()

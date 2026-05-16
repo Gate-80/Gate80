@@ -25,7 +25,7 @@ def _estimate_response_length(headers) -> Optional[int]:
     return None
 
 def _categorize_endpoint(path: str) -> str:
-    # عدليها حسب نظامك
+    # د
     if path.startswith("/api/v1/auth"):
         return "auth"
     if path.startswith("/api/v1/users"):

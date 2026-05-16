@@ -67,7 +67,7 @@ CATEGORIES = [
 # ─────────────────────────────────────────────────────────────────────────────
 
 @dataclass
-class RequestSignal:
+class RequestSignal: #it represnt the single request
     """Lightweight behavioral record for one request."""
     timestamp:     float
     path:          str
@@ -75,37 +75,37 @@ class RequestSignal:
     think_time_ms: float
     method:        str = "GET"
 
-    @property
+    @property #if the request ended with an error 
     def is_error(self) -> bool:
         return self.status_code >= 400
 
-    @property
+    @property #if the request error was in auth --> "indiactes brute force"
     def is_auth_error(self) -> bool:
         return "/auth" in self.path and self.status_code >= 400
 
-    @property
+    @property# if its an admin path --> indicates scanning
     def is_admin(self) -> bool:
         return "/admin" in self.path
 
-    @property
+    @property#if its an a wallet path --> could indicates fraud
     def is_wallet_op(self) -> bool:
         return "/wallet" in self.path
 
-    @property
+    @property#if the request consider transfer could be high risk
     def is_transfer(self) -> bool:
         return "/transfer" in self.path
 
-    @property
+    @property #is unknown path --> could indiactes scanning
     def is_unknown_path(self) -> bool:
         return self.status_code == 404
 
     @property
-    def is_signup(self) -> bool:
+    def is_signup(self) -> bool: # attempted signups
         """Successful or attempted POST to the wallet's sign-up endpoint."""
         return "/auth/sign-up" in self.path
 
     @property
-    def is_signup_success(self) -> bool:
+    def is_signup_success(self) -> bool:#checks the successfull sign up
         return self.is_signup and self.status_code in (200, 201)
 
 
@@ -113,7 +113,7 @@ class RequestSignal:
 # Two-layer session window
 # ─────────────────────────────────────────────────────────────────────────────
 
-@dataclass
+@dataclass #its most importnant part represents the whole session
 class SessionWindow:
     """
     Maintains two views of a session simultaneously:
@@ -127,42 +127,42 @@ class SessionWindow:
     attack_type:       Current committed classification.
     auth_fail_count:   Cumulative auth failures (used by credential_based_attacks strategy).
     """
-    requests:          deque = field(default_factory=lambda: deque(maxlen=BEHAVIOR_WINDOW_SIZE))
-    cumulative_scores: dict  = field(default_factory=lambda: {c: 0.0 for c in CATEGORIES})
-    attack_type:       str   = "unknown_suspicious"
-    auth_fail_count:   int   = 0
+    requests:          deque = field(default_factory=lambda: deque(maxlen=BEHAVIOR_WINDOW_SIZE)) #saves last 6 request
+    cumulative_scores: dict  = field(default_factory=lambda: {c: 0.0 for c in CATEGORIES}) #saves the cumulative score evidence 
+    attack_type:       str   = "unknown_suspicious"#the attack name
+    auth_fail_count:   int   = 0 #number of failed  auth
 
-    def add(self, signal: RequestSignal) -> None:
+    def add(self, signal: RequestSignal) -> None:#add new request to the session
         """Decay cumulative evidence, then add the new signal's contribution."""
         for cat in CATEGORIES:
-            self.cumulative_scores[cat] *= DECAY_RATE
+            self.cumulative_scores[cat] *= DECAY_RATE #reduces the old evidence
 
         delta = _score_signal(signal)
         for cat in CATEGORIES:
-            self.cumulative_scores[cat] += delta.get(cat, 0.0)
+            self.cumulative_scores[cat] += delta.get(cat, 0.0) #adds the new evidene
 
-        self.requests.append(signal)
+        self.requests.append(signal) #adds the request to the session
 
-        if signal.is_auth_error:
+        if signal.is_auth_error: #if the auth was error increase the count
             self.auth_fail_count += 1
 
-    def extract_window_features(self) -> dict:
+    def extract_window_features(self) -> dict: #convert the request to numerical features
         """Aggregate features from the rolling window for window-layer scoring."""
         reqs = list(self.requests)
         n = len(reqs)
         if n == 0:
             return {}
 
-        errors        = sum(1 for r in reqs if r.is_error)
-        admin_actions = sum(1 for r in reqs if r.is_admin)
-        wallet_ops    = sum(1 for r in reqs if r.is_wallet_op)
-        transfers     = sum(1 for r in reqs if r.is_transfer)
-        signups       = sum(1 for r in reqs if r.is_signup)
-        unique_ep     = len(set(r.path for r in reqs))
-        think_times   = [r.think_time_ms for r in reqs if r.think_time_ms > 0]
+        errors        = sum(1 for r in reqs if r.is_error) #number of errors
+        admin_actions = sum(1 for r in reqs if r.is_admin) #number of admin activty
+        wallet_ops    = sum(1 for r in reqs if r.is_wallet_op)#number of wallet operation
+        transfers     = sum(1 for r in reqs if r.is_transfer)#number of trsndfers
+        signups       = sum(1 for r in reqs if r.is_signup)#number of attempted signups
+        unique_ep     = len(set(r.path for r in reqs))#diffrent endpoints --> indiactes scanning
+        think_times   = [r.think_time_ms for r in reqs if r.think_time_ms > 0] #avg time between each request -->indicates bots
         avg_think     = sum(think_times) / len(think_times) if think_times else 0
 
-        if n >= 2:
+        if n >= 2: #caculate the request per minute
             duration_sec = reqs[-1].timestamp - reqs[0].timestamp
             rpm = (n / duration_sec * 60) if duration_sec > 0 else 0
         else:
@@ -184,7 +184,7 @@ class SessionWindow:
 # ─────────────────────────────────────────────────────────────────────────────
 # Per-request signal scoring (cumulative layer)
 # ─────────────────────────────────────────────────────────────────────────────
-
+#here we count the cumulative score
 def _score_signal(signal: RequestSignal) -> dict:
     """
     Score a single request signal against each attack category.
