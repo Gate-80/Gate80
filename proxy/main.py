@@ -107,7 +107,7 @@ DECOY_DB_PATH   = os.getenv("DECOY_DB_PATH",   "decoy_wallet.db")
 # Set env var: GATE80_DETECTION_DISABLED=1
 # ─────────────────────────────────────────────────────────────────────────────
 DETECTION_DISABLED = os.getenv("GATE80_DETECTION_DISABLED", "0") == "1"
-
+FORCE_DECOY_API = os.getenv("FORCE_DECOY_API", "0") == "1"
 HOP_BY_HOP_HEADERS = {
     "connection", "keep-alive", "proxy-authenticate",
     "proxy-authorization", "te", "trailers",
@@ -397,18 +397,18 @@ async def log_requests(request: Request, call_next):
 )
 
 async def reverse_proxy(request: Request, path: str):
-    req_id     = request.headers.get("X-Request-Id") or str(uuid.uuid4())
+    req_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     start_time = time.time()
-    client_ip  = get_client_ip(request)
-    sid        = get_session_id(request)
+    client_ip = get_client_ip(request)
+    sid = get_session_id(request)
 
     window = get_or_create_window(sid)
 
-    body     = await request.body()
+    body = await request.body()
     body_str = body.decode("utf-8", errors="ignore") if body else None
-    db       = SessionLocal()
+    db = SessionLocal()
 
-        # Control-plane routes should not affect detection state
+    # Control-plane routes should not affect detection state
     if path.startswith("api/v1/onboarding"):
         try:
             upstream = await forward(request, body, f"{BACKEND_URL}/{path}")
@@ -423,18 +423,20 @@ async def reverse_proxy(request: Request, path: str):
     last_signal_time = window.requests[-1].timestamp if window.requests else start_time
     think_time_ms = (start_time - last_signal_time) * 1000
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Dataset generation mode — skip all detection, forward everything to
-    # the real backend. No sessions are flagged, no decoy routing occurs.
-    # ─────────────────────────────────────────────────────────────────────────
+    # Dataset generation mode — skip detection and decoy routing
     if DETECTION_DISABLED:
         try:
             upstream = await forward(request, body, f"{BACKEND_URL}/{path}")
             response_time_ms = int((time.time() - start_time) * 1000)
 
             db_log(
-                db, req_id, client_ip, request, body_str,
-                upstream.status_code, response_time_ms,
+                db,
+                req_id,
+                client_ip,
+                request,
+                body_str,
+                upstream.status_code,
+                response_time_ms,
                 forwarded_to_backend=True,
                 session_id=sid,
                 anomaly_score=0.0,
@@ -451,18 +453,31 @@ async def reverse_proxy(request: Request, path: str):
         except (httpx.ConnectError, httpx.TimeoutException) as exc:
             response_time_ms = int((time.time() - start_time) * 1000)
             logger.error("GATE80 ❌ backend error in generation mode: %s", exc)
-            db.close()
+
+            db_log(
+                db,
+                req_id,
+                client_ip,
+                request,
+                body_str,
+                503,
+                response_time_ms,
+                forwarded_to_backend=False,
+                backend_error="Backend unavailable",
+                session_id=sid,
+                routed_to="error",
+            )
+
             return Response(
                 content=b'{"detail": "Backend unavailable"}',
                 status_code=503,
                 headers={"Content-Type": "application/json"},
             )
+
         finally:
             db.close()
 
-    # ─────────────────────────────────────────────────────────────────────────
     # Normal operation — detection active
-    # ─────────────────────────────────────────────────────────────────────────
     pre_flagged = False
     if detector is not None:
         state = detector.get_or_create_session(sid)
@@ -480,7 +495,6 @@ async def reverse_proxy(request: Request, path: str):
                     )
 
         pre_flagged = state.is_anomalous
-
 
     try:
         # ─────────────────────────────────────────────────────────────────────
@@ -581,10 +595,15 @@ async def reverse_proxy(request: Request, path: str):
                 logger.error("GATE80 adaptive decoy failed: %s", exc)
 
                 db_log(
-                    db, req_id, client_ip, request, body_str,
-                    503, response_time_ms,
+                    db,
+                    req_id,
+                    client_ip,
+                    request,
+                    body_str,
+                    503,
+                    response_time_ms,
                     forwarded_to_backend=False,
-                    backend_error=f"Adaptive decoy failure: {exc}",
+                    backend_error=f"Decoy routing failure: {exc}",
                     session_id=sid,
                     routed_to="error",
                     attack_type=window.attack_type,
@@ -597,111 +616,127 @@ async def reverse_proxy(request: Request, path: str):
                 )
 
         # Branch B: normal session → forward to real backend
-        # ─────────────────────────────────────────────────────────────────────
-        else:
-            try:
-                upstream = await forward(request, body, f"{BACKEND_URL}/{path}")
-                response_time_ms = int((time.time() - start_time) * 1000)
+        try:
+            upstream = await forward(request, body, f"{BACKEND_URL}/{path}")
+            response_time_ms = int((time.time() - start_time) * 1000)
 
-                think_time_ms = 0
-                window.add(RequestSignal(
+            window.add(
+                RequestSignal(
                     timestamp=start_time,
                     path=request.url.path,
                     status_code=upstream.status_code,
                     think_time_ms=think_time_ms,
-                ))
+                )
+            )
 
-                if detector is not None:
-                    is_anomalous, score = detector.process_request(
-                        sid, request.url.path,
-                        upstream.status_code, response_time_ms,
-                    )
-                else:
-                    is_anomalous, score = False, 0.0
+            if detector is not None:
+                is_anomalous, score = detector.process_request(
+                    sid,
+                    request.url.path,
+                    upstream.status_code,
+                    response_time_ms,
+                )
+            else:
+                is_anomalous, score = False, 0.0
 
-                
+            attack_type = window.attack_type
 
-                attack_type = window.attack_type
+            if is_anomalous:
+                attack_type = classify_behavior(window)
+                window.attack_type = attack_type
 
-                if is_anomalous:
-                    # Classify immediately — cumulative layer has been
-                    # accumulating evidence since the first request
-                    attack_type = classify_behavior(window)
-                    window.attack_type = attack_type
+                token = request.headers.get("X-User-Token")
+                if token:
+                    mirror_token_to_decoy(token)
 
-                    token = request.headers.get("X-User-Token")
-                    if token:
-                        mirror_token_to_decoy(token)
-                        logger.warning(
-                         "GATE80 🚨 [FLAGGED] sid=%-40s score=%.4f attack_type=%s "
-                           "→ next requests → adaptive decoy",
-                         sid,
-                         score,
-                         attack_type,
-                                         )
-                else:
-                    logger.info(
-                        "GATE80 ✅ [BACKEND]  sid=%-40s score=%.4f  "
-                        "%s %s → %d",
-                        sid, score, request.method,
-                        request.url.path, upstream.status_code,
-                    )
-
-                db_log(
-                    db, req_id, client_ip, request, body_str,
-                    upstream.status_code, response_time_ms,
-                    forwarded_to_backend=True,
-                    session_id=sid,
-                    anomaly_score=score,
-                    routed_to="backend",
-                    flagged_as_suspicious=is_anomalous,
-                    suspicion_reason=f"IF score={score:.4f}" if is_anomalous else None,
-                    attack_type=attack_type,
+                logger.warning(
+                    "GATE80 🚨 [FLAGGED] sid=%-40s score=%.4f attack_type=%s "
+                    "→ next requests → adaptive decoy",
+                    sid,
+                    score,
+                    attack_type,
                 )
 
-                return Response(
-                    content=upstream.content,
-                    status_code=upstream.status_code,
-                    headers=dict(upstream.headers),
+            else:
+                logger.info(
+                    "GATE80 ✅ [BACKEND] sid=%-40s score=%.4f %s %s → %d",
+                    sid,
+                    score,
+                    request.method,
+                    request.url.path,
+                    upstream.status_code,
                 )
 
-            except httpx.ConnectError:
-                response_time_ms = int((time.time() - start_time) * 1000)
-                logger.error("GATE80 ❌ backend unavailable at %s", BACKEND_URL)
+            db_log(
+                db,
+                req_id,
+                client_ip,
+                request,
+                body_str,
+                upstream.status_code,
+                response_time_ms,
+                forwarded_to_backend=True,
+                session_id=sid,
+                anomaly_score=score,
+                routed_to="backend",
+                flagged_as_suspicious=is_anomalous,
+                suspicion_reason=f"RF score={score:.4f}" if is_anomalous else None,
+                attack_type=attack_type,
+            )
 
-                db_log(
-                    db, req_id, client_ip, request, body_str,
-                    503, response_time_ms,
-                    forwarded_to_backend=False,
-                    backend_error="Backend service unavailable",
-                    session_id=sid,
-                    routed_to="error",
-                )
+            return Response(
+                content=upstream.content,
+                status_code=upstream.status_code,
+                headers=dict(upstream.headers),
+            )
 
-                return Response(
-                    content=b'{"detail": "Backend service unavailable"}',
-                    status_code=503,
-                    headers={"Content-Type": "application/json"},
-                )
+        except httpx.ConnectError:
+            response_time_ms = int((time.time() - start_time) * 1000)
+            logger.error("GATE80 ❌ backend unavailable at %s", BACKEND_URL)
 
-            except httpx.TimeoutException:
-                response_time_ms = int((time.time() - start_time) * 1000)
-                logger.error("GATE80 ⏱  backend timeout: %s/%s", BACKEND_URL, path)
+            db_log(
+                db,
+                req_id,
+                client_ip,
+                request,
+                body_str,
+                503,
+                response_time_ms,
+                forwarded_to_backend=False,
+                backend_error="Backend service unavailable",
+                session_id=sid,
+                routed_to="error",
+            )
 
-                db_log(
-                    db, req_id, client_ip, request, body_str,
-                    504, response_time_ms,
-                    forwarded_to_backend=False,
-                    backend_error="Request timeout",
-                    session_id=sid,
-                    routed_to="error",
-                )
+            return Response(
+                content=b'{"detail": "Backend service unavailable"}',
+                status_code=503,
+                headers={"Content-Type": "application/json"},
+            )
 
-                return Response(
-                    content=b'{"detail": "Request timed out"}',
-                    status_code=504,
-                    headers={"Content-Type": "application/json"},
-                )
+        except httpx.TimeoutException:
+            response_time_ms = int((time.time() - start_time) * 1000)
+            logger.error("GATE80 ⏱ backend timeout: %s/%s", BACKEND_URL, path)
+
+            db_log(
+                db,
+                req_id,
+                client_ip,
+                request,
+                body_str,
+                504,
+                response_time_ms,
+                forwarded_to_backend=False,
+                backend_error="Request timeout",
+                session_id=sid,
+                routed_to="error",
+            )
+
+            return Response(
+                content=b'{"detail": "Request timed out"}',
+                status_code=504,
+                headers={"Content-Type": "application/json"},
+            )
 
     finally:
         db.close()
